@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Moon } from 'lucide-react';
-import { DashboardLayout } from './layouts/DashboardLayout';
+import DashboardLayout from './layouts/DashboardLayout';
 import TopPicks from './components/TopPicks';
 import MarketMovers from './components/MarketMovers';
 import PredictionEngine from './components/PredictionEngine';
@@ -26,7 +26,7 @@ function App() {
             <PredictionEngine isRevealed={isRevealed} />
           </div>
           <div className="col-span-12 lg:col-span-4 space-y-6">
-            <TopPicks />
+            <TopPicks timeframe="1h" />
             <MarketMovers />
           </div>
         </div>

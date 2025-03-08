@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, AlertTriangle, X, Settings, TrendingUp, Activity, MessageCircle } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Card } from './ui/Card';
+import Card from './ui/Card';
 import { useMarketData } from '../hooks/useMarketData';
 import { sentimentService } from '../services/sentiment/SentimentService';
 

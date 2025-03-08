@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Download, Table, TrendingUp, Calendar, FileText, Check, MessageCircle } from 'lucide-react';
-import Button from './ui/Button';
+import { useState } from 'react';
+import { Download, Table, TrendingUp, FileText, Check, MessageCircle } from 'lucide-react';
+import { Button } from './ui/Button';
 import Card from './ui/Card';
 import { useMarketData } from '../hooks/useMarketData';
 import { sentimentService } from '../services/sentiment/SentimentService';

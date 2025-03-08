@@ -17,18 +17,6 @@ interface BinanceServiceConfig {
 
 export class BinanceService {
   private static instance: BinanceService;
-
-  private constructor() {
-    // Private constructor to prevent direct instantiation
-  }
-
-  public static getInstance(): BinanceService {
-    if (!BinanceService.instance) {
-      BinanceService.instance = new BinanceService();
-    }
-    return BinanceService.instance;
-  }
-
   private client: any;
   private symbols: string[] = [];
   private subscribers: Map<string, Function[]> = new Map();
@@ -45,7 +33,7 @@ export class BinanceService {
   private static marketDataCache: Map<string, any> = new Map();
   private static topMarketCapCoins: string[] = [];
 
-  constructor(config: Partial<BinanceServiceConfig> = {}) {
+  private constructor(config: Partial<BinanceServiceConfig> = {}) {
     const defaultConfig: BinanceServiceConfig = {
       enableRateLimit: true,
       enableCache: true,
@@ -53,21 +41,28 @@ export class BinanceService {
       enableErrorRecovery: true,
       ...config
     };
-
+    
     this.client = Binance({
       apiKey: BINANCE_CONFIG.API_KEY,
       apiSecret: BINANCE_CONFIG.API_SECRET,
       timeout: 30000,
     });
-
+    
     this.validationService = new DataValidationService();
     this.errorRecovery = new ErrorRecoveryService();
     this.cache = new CacheService({
       maxAge: BINANCE_CONFIG.CACHE_DURATION.MARKET_DATA,
       maxSize: 1000
     });
-
+    
     this.setupRateLimitReset();
+  }
+
+  public static getInstance(config: Partial<BinanceServiceConfig> = {}): BinanceService {
+    if (!BinanceService.instance) {
+      BinanceService.instance = new BinanceService(config);
+    }
+    return BinanceService.instance;
   }
 
   private setupRateLimitReset(): void {

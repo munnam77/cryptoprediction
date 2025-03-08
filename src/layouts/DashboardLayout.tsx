@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { ReactNode, useState, useEffect } from 'react';
 import { Layers, Clock, RefreshCw, Settings, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import Tooltip from '../components/ui/Tooltip';
@@ -17,7 +17,11 @@ import DataExport from '../components/DataExport';
 import TestRunner from '../components/TestRunner';
 import PredictionReveal from '../components/PredictionReveal';
 
-const DashboardLayout: React.FC = () => {
+interface DashboardLayoutProps {
+  children?: ReactNode;
+}
+
+const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   // State for selected timeframe
   const [selectedTimeframe, setSelectedTimeframe] = useState<'15m' | '30m' | '1h' | '4h' | '1d'>('1h');
   
@@ -238,89 +242,7 @@ const DashboardLayout: React.FC = () => {
         
         {/* Main Content Area */}
         <div className="flex-1 overflow-auto p-4">
-          {viewMode === 'default' && (
-            <div className="space-y-6">
-              {/* Live Market Overview */}
-              <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-                <div className="flex items-center justify-between border-b border-gray-700 p-4">
-                  <h2 className="text-lg font-medium">Live Market Overview</h2>
-                  {selectedSymbol && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setSelectedSymbol('')}
-                    >
-                      Clear Selection
-                    </Button>
-                  )}
-                </div>
-                <LiveMarketTracker 
-                  timeframe={selectedTimeframe} 
-                  onSelectSymbol={handleSymbolSelect}
-                />
-              </div>
-              
-              {/* Selected Symbol Information (conditionally shown) */}
-              {selectedSymbol && (
-                <div className="grid lg:grid-cols-2 gap-4">
-                  <PredictionReveal 
-                    symbol={selectedSymbol}
-                    timeframe={selectedTimeframe}
-                  />
-                  <TechnicalAnalysis 
-                    symbol={selectedSymbol}
-                    timeframe={selectedTimeframe}
-                  />
-                </div>
-              )}
-              
-              {/* Prediction Dashboard */}
-              <PredictionDashboard 
-                timeframe={selectedTimeframe}
-                selectedSymbol={selectedSymbol}
-              />
-            </div>
-          )}
-          
-          {viewMode === 'predictions' && (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <PredictionReveal 
-                  symbol={selectedSymbol || 'BTCUSDT'} 
-                  timeframe={selectedTimeframe}
-                />
-                <PredictionAccuracy />
-              </div>
-              <HistoricalAccuracy 
-                symbol={selectedSymbol || 'BTCUSDT'}
-                timeframe={selectedTimeframe}
-              />
-            </div>
-          )}
-          
-          {viewMode === 'technical' && (
-            <div className="space-y-6">
-              <TechnicalAnalysis 
-                symbol={selectedSymbol || 'BTCUSDT'}
-                timeframe={selectedTimeframe}
-                expanded
-              />
-              {/* Other technical components would go here */}
-            </div>
-          )}
-          
-          {viewMode === 'monitoring' && (
-            <div className="space-y-6">
-              <SystemMonitoring />
-              {/* Other monitoring components would go here */}
-            </div>
-          )}
-        </div>
-        
-        {/* Footer */}
-        <div className="bg-gray-800 border-t border-gray-700 p-2 text-xs text-gray-500 flex justify-between items-center">
-          <span>CryptoPrediction Dashboard v1.0</span>
-          <span>© 2025 | Real-time data from Binance</span>
+          {children}
         </div>
       </div>
     </div>

@@ -14,10 +14,13 @@ interface MarketData {
   predictionConfidence: number | null; // 0-100 percentage
   heatmapScore: number | null; // For heatmap indicator
   timestamp: number;
+  priceChangePercent: Record<TimeframeOption, number | null>;
+  volumeChangePercent: Record<TimeframeOption, number | null>;
+  volatility: Record<TimeframeOption, number | null>;
 }
 
 interface MarketDataOptions {
-  excludeTop10: boolean;
+  excludeTop10?: boolean;
   minMarketCap?: number;
   maxMarketCap?: number;
   minVolume?: number;
@@ -37,7 +40,7 @@ export function useMarketData({
   timeframe = '1h',
   limit = 100,
   refreshInterval = 60000, // 1 minute refresh by default
-}: MarketDataOptions) {
+}: MarketDataOptions = { timeframe: '1h' }) {
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -87,7 +90,29 @@ export function useMarketData({
             prediction?.predicted_change_pct || 0,
             prediction?.confidence_score || 0
           ),
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          // Add timeframe-specific data
+          priceChangePercent: {
+            '15m': timeframeMetrics?.price_change_pct_15m || null,
+            '30m': timeframeMetrics?.price_change_pct_30m || null,
+            '1h': timeframeMetrics?.price_change_pct_1h || null,
+            '4h': timeframeMetrics?.price_change_pct_4h || null,
+            '1d': timeframeMetrics?.price_change_pct_1d || null,
+          },
+          volumeChangePercent: {
+            '15m': timeframeMetrics?.volume_change_pct_15m || null,
+            '30m': timeframeMetrics?.volume_change_pct_30m || null,
+            '1h': timeframeMetrics?.volume_change_pct_1h || null,
+            '4h': timeframeMetrics?.volume_change_pct_4h || null,
+            '1d': timeframeMetrics?.volume_change_pct_1d || null,
+          },
+          volatility: {
+            '15m': timeframeMetrics?.volatility_15m || null,
+            '30m': timeframeMetrics?.volatility_30m || null,
+            '1h': timeframeMetrics?.volatility_1h || null,
+            '4h': timeframeMetrics?.volatility_4h || null,
+            '1d': timeframeMetrics?.volatility_1d || null,
+          }
         };
       });
       
@@ -170,6 +195,61 @@ export function useMarketData({
     });
   };
 
+  // Function to get market data for a specific symbol
+  const getMarketData = async (symbol: string): Promise<MarketData | null> => {
+    try {
+      const baseData = await BinanceService.getMarketData(symbol);
+      if (!baseData) return null;
+      
+      const timeframeMetrics = await DatabaseService.getTimeframeMetrics(symbol, timeframe);
+      const latestPredictions = await DatabaseService.getTopPredictions(timeframe);
+      const prediction = latestPredictions.find(p => p.trading_pair === symbol);
+      
+      return {
+        tradingPair: symbol,
+        price: baseData.price,
+        timeframeChangePct: timeframeMetrics?.price_change_pct || null,
+        volumeChangePct: timeframeMetrics?.volume_change_pct || null,
+        marketCap: baseData.marketCap,
+        volatilityScore: timeframeMetrics?.volatility_score || null,
+        liquidityScore: timeframeMetrics?.liquidity_score || null,
+        predictionConfidence: prediction?.confidence_score || null,
+        heatmapScore: calculateHeatmapScore(
+          timeframeMetrics?.price_change_pct || 0,
+          timeframeMetrics?.volume_change_pct || 0,
+          prediction?.predicted_change_pct || 0,
+          prediction?.confidence_score || 0
+        ),
+        timestamp: Date.now(),
+        // Add timeframe-specific data
+        priceChangePercent: {
+          '15m': timeframeMetrics?.price_change_pct_15m || null,
+          '30m': timeframeMetrics?.price_change_pct_30m || null,
+          '1h': timeframeMetrics?.price_change_pct_1h || null,
+          '4h': timeframeMetrics?.price_change_pct_4h || null,
+          '1d': timeframeMetrics?.price_change_pct_1d || null,
+        },
+        volumeChangePercent: {
+          '15m': timeframeMetrics?.volume_change_pct_15m || null,
+          '30m': timeframeMetrics?.volume_change_pct_30m || null,
+          '1h': timeframeMetrics?.volume_change_pct_1h || null,
+          '4h': timeframeMetrics?.volume_change_pct_4h || null,
+          '1d': timeframeMetrics?.volume_change_pct_1d || null,
+        },
+        volatility: {
+          '15m': timeframeMetrics?.volatility_15m || null,
+          '30m': timeframeMetrics?.volatility_30m || null,
+          '1h': timeframeMetrics?.volatility_1h || null,
+          '4h': timeframeMetrics?.volatility_4h || null,
+          '1d': timeframeMetrics?.volatility_1d || null,
+        }
+      };
+    } catch (err) {
+      console.error('Error fetching market data for symbol:', symbol, err);
+      return null;
+    }
+  };
+
   return {
     marketData,
     loading,
@@ -177,6 +257,7 @@ export function useMarketData({
     refresh,
     sortData,
     filterData,
-    timeframe
+    timeframe,
+    getMarketData
   };
 }

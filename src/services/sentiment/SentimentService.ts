@@ -1,39 +1,4 @@
-import axios from 'axios';
-import { DatabaseService } from '../database/DatabaseService';
-import { DB_CONFIG } from '../../config/database.config';
 import { SentimentAnalysisResult } from '../../types/model';
-
-// Twitter/X API configuration
-const TWITTER_API_CONFIG = {
-  BASE_URL: 'https://api.twitter.com/2',
-  TWEETS_ENDPOINT: '/tweets/search/recent',
-  MAX_RESULTS: 100,
-  REQUEST_DELAY: 1000 * 60 * 15, // 15 minutes to avoid rate limiting
-  HEADERS: {
-    'Authorization': `Bearer ${process.env.TWITTER_API_BEARER_TOKEN || ''}`,
-    'Content-Type': 'application/json'
-  },
-  CACHE_DURATION: 30 * 60 * 1000, // 30 minutes cache
-};
-
-// NLP model for sentiment analysis
-interface SentimentAnalysis {
-  asset: string;
-  score: number; // -1 to 1, where -1 is very negative, 0 is neutral, 1 is very positive
-  magnitude: number; // 0 to +inf, representing strength of sentiment regardless of polarity
-  tweets_analyzed: number; 
-  timestamp: number;
-  sources: {
-    twitter: number; // percentage from twitter
-    reddit?: number; // percentage from reddit if available
-    news?: number;   // percentage from news if available
-  };
-  keywords: {
-    word: string;
-    frequency: number;
-    sentiment: number;
-  }[];
-}
 
 /**
  * Service for analyzing sentiment data from social media platforms like X (Twitter)
@@ -143,7 +108,6 @@ class SentimentService {
     const totalMentions = Math.floor(Math.random() * 2000) + 100;
     const positivePercent = adjustedScore / 100;
     const negativePercent = (100 - adjustedScore) / 200; // Half the remaining percentage
-    const neutralPercent = 1 - positivePercent - negativePercent;
     
     const positiveCount = Math.floor(totalMentions * positivePercent);
     const negativeCount = Math.floor(totalMentions * negativePercent);
