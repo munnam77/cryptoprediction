@@ -17,7 +17,7 @@ class SentimentService {
 
   constructor() {
     // Try to load API key from environment
-    this.apiKey = process.env.SENTIMENT_API_KEY || null;
+    this.apiKey = import.meta.env.VITE_SENTIMENT_API_KEY || null;
   }
 
   /**
