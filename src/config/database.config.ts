@@ -1,15 +1,20 @@
-import { createPool } from '@vercel/postgres';
+// Mock database configuration for development
+// Instead of using @vercel/postgres, we'll use in-memory storage
 
-// Database connection configuration
-export const db = createPool({
-  connectionString: process.env.POSTGRES_URL,
-  ssl: {
-    rejectUnauthorized: false // For development, adjust based on environment
+// Define a mock db object with similar interface to @vercel/postgres
+export const db = {
+  connect: async () => {
+    console.log('Using mock database implementation');
+    return Promise.resolve();
   },
-  max: 10, // Maximum number of connections in the pool
-  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 2000, // How long to wait before timing out when connecting a new client
-});
+  query: async (text: string, params?: any[]) => {
+    console.log('Mock query:', text, params);
+    return { rows: [], rowCount: 0 };
+  },
+  end: async () => {
+    return Promise.resolve();
+  }
+};
 
 /**
  * Database configuration settings

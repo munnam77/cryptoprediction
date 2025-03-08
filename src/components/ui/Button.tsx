@@ -1,9 +1,9 @@
 import React from 'react';
-import { colors, transitions } from '../../styles/theme';
+import { transitions } from '../../styles/theme';
 
 interface ButtonProps {
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   disabled?: boolean;
@@ -39,7 +39,7 @@ export const Button: React.FC<ButtonProps> = ({
     focus:outline-none
     focus:ring-2
     focus:ring-offset-2
-    focus:ring-offset-dark-900
+    focus:ring-offset-gray-900
     disabled:opacity-50
     disabled:cursor-not-allowed
   `;
@@ -53,32 +53,32 @@ export const Button: React.FC<ButtonProps> = ({
   const variantStyles = {
     primary: `
       bg-gradient-to-r
-      from-primary-600
-      to-primary-500
+      from-indigo-600
+      to-indigo-500
       text-white
-      hover:from-primary-500
-      hover:to-primary-400
-      active:from-primary-700
-      active:to-primary-600
-      focus:ring-primary-500
+      hover:from-indigo-500
+      hover:to-indigo-400
+      active:from-indigo-700
+      active:to-indigo-600
+      focus:ring-indigo-500
     `,
     secondary: `
       bg-gradient-to-r
-      from-secondary-600
-      to-secondary-500
+      from-purple-600
+      to-purple-500
       text-white
-      hover:from-secondary-500
-      hover:to-secondary-400
-      active:from-secondary-700
-      active:to-secondary-600
-      focus:ring-secondary-500
+      hover:from-purple-500
+      hover:to-purple-400
+      active:from-purple-700
+      active:to-purple-600
+      focus:ring-purple-500
     `,
     ghost: `
-      bg-dark-800/30
-      text-dark-100
-      hover:bg-dark-700/50
-      active:bg-dark-900/70
-      focus:ring-dark-500
+      bg-gray-800/30
+      text-gray-100
+      hover:bg-gray-700/50
+      active:bg-gray-900/70
+      focus:ring-gray-500
       backdrop-blur-sm
     `,
     danger: `
@@ -91,6 +91,16 @@ export const Button: React.FC<ButtonProps> = ({
       active:from-red-700
       active:to-red-600
       focus:ring-red-500
+    `,
+    outline: `
+      bg-transparent
+      border
+      border-gray-600
+      text-gray-300
+      hover:bg-gray-700
+      hover:border-gray-500
+      active:bg-gray-800
+      focus:ring-gray-500
     `,
   };
 

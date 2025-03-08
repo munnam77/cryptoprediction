@@ -65,7 +65,6 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   // Responsive layout detection
   const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1280);
-
   useEffect(() => {
     const handleResize = () => {
       setIsLargeScreen(window.innerWidth >= 1280);
@@ -116,15 +115,19 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         
         {/* Sidebar Components - Primary Analysis */}
         <div className="p-4 space-y-4">
-          <PredictionCard
-            symbol={selectedSymbol || 'BTCUSDT'}
-            timeframe={selectedTimeframe}
-          />
+          {selectedSymbol && (
+            <PredictionCard
+              symbol={selectedSymbol}
+              timeframe={selectedTimeframe}
+            />
+          )}
           
-          <SentimentAnalysis
-            symbol={selectedSymbol || 'BTCUSDT'}
-            timeframe={selectedTimeframe}
-          />
+          {selectedSymbol && (
+            <SentimentAnalysis
+              symbol={selectedSymbol}
+              timeframe={selectedTimeframe}
+            />
+          )}
           
           <AlertSystem className="mt-4" />
           
@@ -164,6 +167,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <TimeframeSelector 
               selectedTimeframe={selectedTimeframe} 
               onChange={handleTimeframeChange} 
+              variant="buttons"
             />
             
             {/* View Mode Selector */}

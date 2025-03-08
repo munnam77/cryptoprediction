@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { TimeframeOption, TIMEFRAME_OPTIONS } from '../config/database.config';
 
 interface TimeframeSelectorProps {
-  defaultTimeframe?: TimeframeOption;
-  onTimeframeChange: (timeframe: TimeframeOption) => void;
+  selectedTimeframe?: TimeframeOption | string;
+  defaultTimeframe?: TimeframeOption | string;
+  onTimeframeChange?: (timeframe: TimeframeOption) => void;
+  onChange?: (timeframe: TimeframeOption | string) => void;
   variant?: 'tabs' | 'dropdown' | 'buttons';
   className?: string;
 }
@@ -13,16 +15,29 @@ interface TimeframeSelectorProps {
  * Supports multiple UI variants: tabs, dropdown, or buttons
  */
 const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
+  selectedTimeframe: externalSelectedTimeframe,
   defaultTimeframe = '1h',
   onTimeframeChange,
+  onChange,
   variant = 'tabs',
   className = ''
 }) => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeOption>(defaultTimeframe);
+  const [internalSelectedTimeframe, setInternalSelectedTimeframe] = useState<TimeframeOption | string>(defaultTimeframe);
+  
+  // Use external selectedTimeframe if provided, otherwise use internal state
+  const selectedTimeframe = externalSelectedTimeframe !== undefined ? externalSelectedTimeframe : internalSelectedTimeframe;
 
-  const handleTimeframeChange = (timeframe: TimeframeOption) => {
-    setSelectedTimeframe(timeframe);
-    onTimeframeChange(timeframe);
+  const handleTimeframeChange = (timeframe: TimeframeOption | string) => {
+    setInternalSelectedTimeframe(timeframe);
+    
+    // Support both callback patterns used in the application
+    if (onTimeframeChange) {
+      onTimeframeChange(timeframe as TimeframeOption);
+    }
+    
+    if (onChange) {
+      onChange(timeframe);
+    }
   };
 
   // Render as tabs (default)
@@ -40,7 +55,7 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
                 }
               `}
-              onClick={() => handleTimeframeChange(timeframe as TimeframeOption)}
+              onClick={() => handleTimeframeChange(timeframe)}
             >
               {timeframe}
             </button>
@@ -55,8 +70,8 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
     return (
       <div className={`relative inline-block ${className}`}>
         <select
-          value={selectedTimeframe}
-          onChange={(e) => handleTimeframeChange(e.target.value as TimeframeOption)}
+          value={selectedTimeframe.toString()}
+          onChange={(e) => handleTimeframeChange(e.target.value)}
           className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
         >
           {TIMEFRAME_OPTIONS.map((timeframe) => (
@@ -91,7 +106,7 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
                 : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
             }
           `}
-          onClick={() => handleTimeframeChange(timeframe as TimeframeOption)}
+          onClick={() => handleTimeframeChange(timeframe)}
         >
           {timeframe}
         </button>

@@ -1,3 +1,5 @@
+import { BINANCE_CONFIG } from '../config/binance.config';
+
 const BINANCE_API_BASE = 'https://api.binance.com/api/v3';
 const BINANCE_WS_BASE = 'wss://stream.binance.com:9443/ws';
 
@@ -12,9 +14,7 @@ export interface TickerData {
 
 let ws: WebSocket | null = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const INITIAL_RECONNECT_DELAY = 1000;
-const MAX_RECONNECT_DELAY = 30000;
+let reconnectTimeout: NodeJS.Timeout | null = null;
 
 // Cache for storing the latest ticker data
 const tickerCache = new Map<string, TickerData>();
@@ -22,11 +22,91 @@ const tickerCache = new Map<string, TickerData>();
 function getReconnectDelay(): number {
   // Exponential backoff with jitter
   const exponentialDelay = Math.min(
-    INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
-    MAX_RECONNECT_DELAY
+    BINANCE_CONFIG.RETRY_DELAY * Math.pow(2, reconnectAttempts),
+    BINANCE_CONFIG.WS_RECONNECT_DELAY
   );
   const jitter = Math.random() * 1000;
   return exponentialDelay + jitter;
+}
+
+function connectWebSocket() {
+  if (ws) {
+    ws.close();
+  }
+
+  ws = new WebSocket(BINANCE_WS_BASE);
+
+  ws.onopen = () => {
+    console.log('WebSocket connected');
+    reconnectAttempts = 0;
+    // Subscribe to ticker streams
+    if (ws) {
+      ws.send(JSON.stringify({
+        method: 'SUBSCRIBE',
+        params: ['!ticker@arr'],
+        id: 1
+      }));
+    }
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (Array.isArray(data)) {
+        data.forEach(ticker => {
+          if (!BINANCE_CONFIG.BLACKLISTED_PAIRS.some(pair => ticker.s.endsWith(pair))) {
+            tickerCache.set(ticker.s, {
+              symbol: ticker.s,
+              priceChange: ticker.p,
+              priceChangePercent: ticker.P,
+              lastPrice: ticker.c,
+              volume: ticker.v,
+              quoteVolume: ticker.q
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error processing WebSocket message:', error);
+    }
+  };
+
+  ws.onclose = () => {
+    console.log('WebSocket disconnected');
+    if (reconnectAttempts < BINANCE_CONFIG.WS_MAX_RECONNECT_ATTEMPTS) {
+      const delay = getReconnectDelay();
+      reconnectTimeout = setTimeout(() => {
+        reconnectAttempts++;
+        connectWebSocket();
+      }, delay);
+    }
+  };
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+}
+
+// Initialize WebSocket connection
+connectWebSocket();
+
+// Cleanup function
+export function cleanup() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+  }
+  if (ws) {
+    ws.close();
+  }
+}
+
+// Export functions to access ticker data
+export function getTickerData(): TickerData[] {
+  return Array.from(tickerCache.values());
+}
+
+export function getTickerBySymbol(symbol: string): TickerData | undefined {
+  return tickerCache.get(symbol);
 }
 
 // Mock data for development (in case API fails)
