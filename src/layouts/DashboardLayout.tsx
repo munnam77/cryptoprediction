@@ -1,167 +1,330 @@
-import React, { useState } from 'react';
-import { glassmorphism, gradients, transitions } from '../styles/theme';
+import React, { useState, useEffect } from 'react';
+import { Layers, Clock, RefreshCw, Settings, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import Tooltip from '../components/ui/Tooltip';
+import LiveMarketTracker from '../components/LiveMarketTracker';
+import PredictionDashboard from '../components/PredictionDashboard';
+import SentimentAnalysis from '../components/SentimentAnalysis';
+import TimeframeSelector from '../components/TimeframeSelector';
+import AlertSystem from '../components/AlertSystem';
+import PredictionCard from '../components/PredictionCard';
+import TechnicalAnalysis from '../components/TechnicalAnalysis';
+import PredictionAccuracy from '../components/PredictionAccuracy';
+import SystemMonitoring from '../components/SystemMonitoring';
+import HistoricalAccuracy from '../components/HistoricalAccuracy';
+import TopPicks from '../components/TopPicks';
+import DataExport from '../components/DataExport';
+import TestRunner from '../components/TestRunner';
+import PredictionReveal from '../components/PredictionReveal';
 
-interface DashboardLayoutProps {
-  children: React.ReactNode;
-}
+const DashboardLayout: React.FC = () => {
+  // State for selected timeframe
+  const [selectedTimeframe, setSelectedTimeframe] = useState<'15m' | '30m' | '1h' | '4h' | '1d'>('1h');
+  
+  // State for selected symbol
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('');
+  
+  // State for sidebar visibility on mobile
+  const [showSidebar, setShowSidebar] = useState(false);
+  
+  // State for last data refresh
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  
+  // State for view mode (can be 'default', 'predictions', 'technical', 'monitoring')
+  const [viewMode, setViewMode] = useState<string>('default');
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // Handle timeframe change
+  const handleTimeframeChange = (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => {
+    setSelectedTimeframe(timeframe);
+  };
 
-  const menuItems = [
-    { icon: '📊', label: 'Dashboard', isActive: true },
-    { icon: '📈', label: 'Live Market' },
-    { icon: '🎯', label: 'Predictions' },
-    { icon: '📋', label: 'History' },
-    { icon: '⚙️', label: 'Settings' },
-  ];
+  // Handle symbol selection
+  const handleSymbolSelect = (symbol: string) => {
+    setSelectedSymbol(symbol);
+  };
+
+  // Handle manual data refresh
+  const handleRefresh = () => {
+    // The components with useBinanceData hook will refresh their data
+    setLastRefresh(new Date());
+    // This is just for UI indication, the actual refresh happens in the components
+  };
+
+  // Auto refresh every 60 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setLastRefresh(new Date());
+    }, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Responsive layout detection
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1280);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1280);
+      if (window.innerWidth >= 1024) {
+        setShowSidebar(true);
+      } else {
+        setShowSidebar(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Check on initial render
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {/* Background gradient effects */}
-      <div
-        className="fixed inset-0 z-0"
-        style={{
-          background: gradients.primary,
-          opacity: 0.1,
-          backgroundSize: '200% 200%',
-        }}
-      />
-      
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed
-          left-0
-          top-0
-          h-full
-          ${isSidebarOpen ? 'w-64' : 'w-20'}
-          transition-all
-          duration-300
-          ease-in-out
-          z-50
-          bg-opacity-20
-          bg-gray-800
-          backdrop-blur-lg
-          border-r
-          border-gray-700/30
-        `}
-      >
-        {/* Logo */}
-        <div className="h-16 flex items-center justify-center border-b border-gray-700/30">
-          <span className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 text-transparent bg-clip-text">
-            {isSidebarOpen ? 'CryptoPrediction' : 'CP'}
-          </span>
-        </div>
-
-        {/* Menu Items */}
-        <nav className="mt-8">
-          {menuItems.map((item, index) => (
-            <div
-              key={index}
-              className={`
-                flex
-                items-center
-                px-6
-                py-3
-                cursor-pointer
-                transition-all
-                duration-200
-                ${item.isActive
-                  ? 'bg-indigo-500/10 border-r-2 border-indigo-500'
-                  : 'hover:bg-white/5'
-                }
-              `}
-            >
-              <span className="text-xl">{item.icon}</span>
-              {isSidebarOpen && (
-                <span className={`
-                  ml-3
-                  text-sm
-                  font-medium
-                  ${item.isActive ? 'text-indigo-400' : 'text-gray-400'}
-                `}>
-                  {item.label}
-                </span>
-              )}
-            </div>
-          ))}
-        </nav>
-
-        {/* Toggle Button */}
+    <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
+      {/* Mobile Sidebar Toggle */}
+      {!isLargeScreen && (
         <button
-          className={`
-            absolute
-            -right-3
-            top-8
-            w-6
-            h-6
-            rounded-full
-            bg-gray-800
-            border
-            border-gray-700
-            flex
-            items-center
-            justify-center
-            cursor-pointer
-            transition-transform
-            duration-300
-            hover:bg-gray-700
-          `}
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          style={{
-            transform: isSidebarOpen ? 'rotate(0deg)' : 'rotate(180deg)',
-          }}
+          onClick={() => setShowSidebar(!showSidebar)}
+          className="fixed bottom-4 right-4 z-50 bg-blue-600 p-3 rounded-full shadow-lg"
         >
-          <svg
-            className="w-4 h-4 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
+          {showSidebar ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
         </button>
-      </aside>
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`${
+          showSidebar ? 'translate-x-0' : '-translate-x-full'
+        } transform lg:translate-x-0 transition-transform duration-300 lg:static fixed inset-y-0 left-0 z-40 w-64 xl:w-72 bg-gray-800 border-r border-gray-700 overflow-y-auto`}
+      >
+        {/* Logo and App Name */}
+        <div className="p-4 flex items-center space-x-2 border-b border-gray-700">
+          <Layers className="h-6 w-6 text-blue-500" />
+          <h1 className="text-xl font-semibold">CryptoPrediction</h1>
+        </div>
+        
+        {/* Symbol Overview */}
+        {selectedSymbol && (
+          <div className="p-4 border-b border-gray-700">
+            <h2 className="text-sm text-gray-400 mb-2">Selected Pair</h2>
+            <div className="text-xl font-bold">{selectedSymbol}</div>
+          </div>
+        )}
+        
+        {/* Sidebar Components - Primary Analysis */}
+        <div className="p-4 space-y-4">
+          <PredictionCard
+            symbol={selectedSymbol || 'BTCUSDT'}
+            timeframe={selectedTimeframe}
+          />
+          
+          <SentimentAnalysis
+            symbol={selectedSymbol || 'BTCUSDT'}
+            timeframe={selectedTimeframe}
+          />
+          
+          <AlertSystem className="mt-4" />
+          
+          <TopPicks />
+        </div>
+        
+        {/* Sidebar Components - Data Export & Testing */}
+        <div className="mt-4 p-4 space-y-4 border-t border-gray-700">
+          <DataExport />
+          
+          <TestRunner />
+          
+          {/* Bottom Info */}
+          <div className="pt-4 text-xs text-gray-500 flex flex-col space-y-1">
+            <div className="flex items-center justify-between">
+              <span>Last Updated:</span>
+              <span>{lastRefresh.toLocaleTimeString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Current Timeframe:</span>
+              <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">{selectedTimeframe}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Data Mode:</span>
+              <span>Real-time</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <main
-        className={`
-          transition-all
-          duration-300
-          ease-in-out
-          ${isSidebarOpen ? 'ml-64' : 'ml-20'}
-        `}
-      >
-        {/* Header */}
-        <header
-          className="h-16 px-6 flex items-center bg-opacity-20 bg-gray-800 backdrop-blur-lg border-b border-gray-700/30"
-        >
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Top Navigation */}
+        <div className="bg-gray-800 border-b border-gray-700 py-3 px-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center space-x-4">
+            {/* Timeframe Selector */}
+            <TimeframeSelector 
+              selectedTimeframe={selectedTimeframe} 
+              onChange={handleTimeframeChange} 
+            />
+            
+            {/* View Mode Selector */}
+            <div className="hidden md:flex items-center space-x-2">
+              <Button
+                size="sm"
+                variant={viewMode === 'default' ? 'primary' : 'outline'}
+                onClick={() => setViewMode('default')}
+              >
+                Market
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'predictions' ? 'primary' : 'outline'}
+                onClick={() => setViewMode('predictions')}
+              >
+                Predictions
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'technical' ? 'primary' : 'outline'}
+                onClick={() => setViewMode('technical')}
+              >
+                Technical
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'monitoring' ? 'primary' : 'outline'}
+                onClick={() => setViewMode('monitoring')}
+              >
+                System
+              </Button>
+            </div>
           </div>
           
-          {/* User Menu */}
-          <div className="flex items-center space-x-4">
-            <button className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors">
-              <span className="text-lg">🔔</span>
-            </button>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" />
-          </div>
-        </header>
-
-        {/* Content */}
-        <div className="p-6">
-          <div className="rounded-xl overflow-hidden bg-gray-800 bg-opacity-30 backdrop-blur-lg border border-gray-700/30">
-            {children}
+          <div className="flex items-center space-x-3">
+            {/* Last Refresh Info */}
+            <div className="hidden md:flex items-center text-xs text-gray-400 mr-2">
+              <Clock size={12} className="mr-1" />
+              <span>Updated {Math.floor((Date.now() - lastRefresh.getTime()) / 1000)}s ago</span>
+            </div>
+            
+            {/* Refresh Button */}
+            <Tooltip content="Refresh market data">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefresh}
+                className="mr-2"
+              >
+                <RefreshCw size={14} />
+              </Button>
+            </Tooltip>
+            
+            {/* Settings Button */}
+            <Tooltip content="Dashboard settings">
+              <Button
+                size="sm"
+                variant="outline"
+              >
+                <Settings size={14} />
+              </Button>
+            </Tooltip>
+            
+            {/* Info Button */}
+            <Tooltip content="Dashboard information">
+              <Button
+                size="sm"
+                variant="outline"
+              >
+                <Info size={14} />
+              </Button>
+            </Tooltip>
           </div>
         </div>
-      </main>
+        
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-auto p-4">
+          {viewMode === 'default' && (
+            <div className="space-y-6">
+              {/* Live Market Overview */}
+              <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                <div className="flex items-center justify-between border-b border-gray-700 p-4">
+                  <h2 className="text-lg font-medium">Live Market Overview</h2>
+                  {selectedSymbol && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedSymbol('')}
+                    >
+                      Clear Selection
+                    </Button>
+                  )}
+                </div>
+                <LiveMarketTracker 
+                  timeframe={selectedTimeframe} 
+                  onSelectSymbol={handleSymbolSelect}
+                />
+              </div>
+              
+              {/* Selected Symbol Information (conditionally shown) */}
+              {selectedSymbol && (
+                <div className="grid lg:grid-cols-2 gap-4">
+                  <PredictionReveal 
+                    symbol={selectedSymbol}
+                    timeframe={selectedTimeframe}
+                  />
+                  <TechnicalAnalysis 
+                    symbol={selectedSymbol}
+                    timeframe={selectedTimeframe}
+                  />
+                </div>
+              )}
+              
+              {/* Prediction Dashboard */}
+              <PredictionDashboard 
+                timeframe={selectedTimeframe}
+                selectedSymbol={selectedSymbol}
+              />
+            </div>
+          )}
+          
+          {viewMode === 'predictions' && (
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <PredictionReveal 
+                  symbol={selectedSymbol || 'BTCUSDT'} 
+                  timeframe={selectedTimeframe}
+                />
+                <PredictionAccuracy />
+              </div>
+              <HistoricalAccuracy 
+                symbol={selectedSymbol || 'BTCUSDT'}
+                timeframe={selectedTimeframe}
+              />
+            </div>
+          )}
+          
+          {viewMode === 'technical' && (
+            <div className="space-y-6">
+              <TechnicalAnalysis 
+                symbol={selectedSymbol || 'BTCUSDT'}
+                timeframe={selectedTimeframe}
+                expanded
+              />
+              {/* Other technical components would go here */}
+            </div>
+          )}
+          
+          {viewMode === 'monitoring' && (
+            <div className="space-y-6">
+              <SystemMonitoring />
+              {/* Other monitoring components would go here */}
+            </div>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-gray-800 border-t border-gray-700 p-2 text-xs text-gray-500 flex justify-between items-center">
+          <span>CryptoPrediction Dashboard v1.0</span>
+          <span>© 2025 | Real-time data from Binance</span>
+        </div>
+      </div>
     </div>
   );
 };
+
+export default DashboardLayout;
