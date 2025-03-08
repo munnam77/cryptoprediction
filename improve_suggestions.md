@@ -1,186 +1,106 @@
-### **Crypto Prediction App - Phase-wise Refinement Instructions**
-
-**Objective:**
-This document breaks down the entire app refinement into clear **phases** for Bolt.new to implement systematically. The primary focus is on **Prediction Accuracy** and **UI/UX Quality**.
+Here’s the updated prompt with the trading pair table enhanced to support multiple timeframes, ensuring all columns dynamically reflect the chosen timeframe. The table will now allow users to switch between timeframes (e.g., 15m, 30m, 1h, 4h, 1d), and each column will update its data accordingly (e.g., Price, 24h Change % becomes Timeframe Change %, Volume Change % adjusts to the selected period). This makes the table more versatile and aligned with a day trader’s need for flexible analysis.
 
 ---
 
-## **Phase 1: Perfecting Prediction Accuracy (Top Priority)**
+**Updated Prompt: Crypto Day Trading Dashboard with Multi-Timeframe Trading Pair Table**
 
-### ✅ **1.1 Improve Prediction Model**
-- Use advanced prediction models like:
-  - **LSTM (Long Short-Term Memory)** for time-series forecasting.
-  - **Transformer Models** for market sentiment analysis.
-- Ensure our app can accurately predict **short-term, mid-term, and long-term price movements**.
-- Focus on accuracy over speed initially — build a strong and reliable prediction engine.
+I want to create an advanced crypto day trading dashboard designed to empower crypto day traders with actionable insights, focusing on high-potential, low-cap gems rather than the top 10 market cap coins. The dashboard should exclude coins like Bitcoin, Ethereum, and other top 10 market cap assets (based on current market cap rankings as of March 08, 2025) to prioritize smaller, volatile coins with higher growth potential. Below are the key features and improvements, with the trading pair table now supporting multiple timeframes.
 
-### ✅ **1.2 Confidence Score Integration (Most Important)**
-- **What is Confidence Score?**
-  - The Confidence Score shows how confident our app is in its prediction.
-  - It ranges from **0% to 100%**. Higher confidence = more accurate prediction.
+### 1. Trading Pair Table
+Design a modern, interactive trading pair table that supports multiple timeframes (15m, 30m, 1h, 4h, 1d) with a dropdown or tab selector above the table to choose the timeframe. All columns should dynamically reflect data for the selected timeframe:
+- **Timeframe Selector:** Dropdown or tabs (e.g., "15m | 30m | 1h | 4h | 1d") at the top of the table. Default to 1h.
+- **Columns:**
+  - **Trading Pair:** e.g., SOL/USDT, ADA/USDT (sortable, static across timeframes).
+  - **Price:** Current price in USD (real-time updates, static across timeframes as it’s the latest price).
+  - **Timeframe Change %:** Percentage price change over the selected timeframe (e.g., for 1h, change since 1 hour ago), color-coded (green for gains, red for losses), formatted as `+12.34%` or `-5.67%`. Replaces "24h Change %" and adjusts dynamically (e.g., 15m shows change over last 15 minutes).
+  - **Volume Change %:** Percentage change in trading volume over the selected timeframe, calculated as `((New Volume - Old Volume) / Old Volume * 100)`, formatted as `+25.00%` or `-15.50%` (2 decimals). Handle edge cases: if Old Volume is zero, display `N/A`. Tooltip shows context (e.g., for 4h: "Volume up 25% in last 4h, current volume: $1.2M").
+  - **Volatility Score:** A custom metric (0-100) indicating price volatility over the selected timeframe, with a tooltip explaining the score (e.g., "Based on price swings in last 1h").
+  - **Market Cap:** Current market cap in USD (sortable, filterable to exclude top 10, static as it’s current value).
+  - **Liquidity:** Liquidity score (0-100) over the selected timeframe, with a tooltip showing buy/sell order depth trend (e.g., "Liquidity stable in last 4h").
+  - **Prediction Confidence:** A percentage (0-100%) showing our engine’s confidence in the coin’s movement for the selected timeframe (details in Prediction Engine below).
+  - **Heatmap Indicator:** A small color-coded heatmap square next to each pair (e.g., green = hot/bullish, red = cold/bearish, yellow = neutral) based on momentum, sentiment, and Volume Change % for the selected timeframe.
 
-- **How to calculate Confidence Score:**
+- **Features:**
+  - Sortable and filterable columns (e.g., filter by Timeframe Change % > +5%, Volume Change % > +50% for the selected timeframe).
+  - Hover tooltips for each column with timeframe-specific context (e.g., for 1h: "Volume Change %: +25.00% in last hour, peak at +30.00% 20m ago").
+  - Clickable rows to expand into a detailed view (e.g., mini chart of price action for the selected timeframe, Volume Change % trend, recent X sentiment).
+  - **Backend:** Store raw data (price, volume, etc.) in Vercel Postgres with timestamps to calculate timeframe-specific metrics server-side. Display calculated values (e.g., Timeframe Change %, Volume Change %) in the frontend.
 
-**Formula:**
-\[
-Confidence Score = 100 - (MAPE * 100)
-\]
+### 2. Enhanced Prediction Engine
+Revamp the prediction engine to focus on low-cap gems with high growth potential, excluding the top 10 market cap coins and prioritizing coins with market caps between $10M and $500M (adjustable range). Use Volume Change % instead of raw volume for trend analysis. The engine should:
+- Use real-time data (price, Volume Change %, volatility), X sentiment analysis, and web news trends to predict price movements.
+- Provide predictions for multiple timeframes: 15m, 30m, 1h, 4h, and 1d.
+- Update predictions at specific intervals:
+  - **1d Timeframe:** Predicts daily top performers at 9:00 AM JST, refreshed every 24 hours.
+  - **4h Timeframe:** Predicts at 9:00 AM, 1:00 PM, 5:00 PM, 9:00 PM, 1:00 AM, 5:00 AM JST (every 4 hours).
+  - **1h Timeframe:** Predicts hourly at the start of each hour (e.g., 9:00 AM, 10:00 AM JST).
+  - **30m/15m Timeframes:** Predicts at the start of each interval (e.g., 9:00 AM, 9:15 AM, 9:30 AM JST).
 
-Where:
-- **MAPE (Mean Absolute Percentage Error)** = Average percentage difference between predicted and actual prices.
-- Lower MAPE = Higher Confidence Score.
+- **Prediction Output:**
+  - For each timeframe, list the top 5 predicted gainers (excluding top 10 market cap coins).
+  - Show:
+    - Predicted % gain (e.g., "Expected to rise 12% in the next 4h").
+    - Confidence score (e.g., "85% confidence").
+    - Volume Change % (e.g., "Volume Change %: +45.00% in last 4h" or "N/A" if baseline volume is zero).
+    - Time of prediction (e.g., "Predicted at 9:00 AM JST").
+    - Actual performance since prediction (e.g., "Since 9:00 AM JST, up 8% as of 11:00 AM JST").
+    - Comparison to actual top gainers (e.g., "Actual top gainer today: X coin, +15%, Volume Change %: +75.00%").
+  - **Backend:** Store raw volume and price data in Vercel Postgres, calculate Volume Change % and other metrics for each timeframe dynamically.
 
-- **Steps to calculate:**
-1. **Compare Predicted Price vs Actual Price** (after 5 minutes, 1 hour, or 24 hours depending on the timeframe).
-2. Calculate the percentage error using MAPE.
-3. Subtract that percentage from **100%** to get the Confidence Score.
+### 3. Top Picks Section
+Replace the current top 10 market cap coin focus with a "Low-Cap Gems" section:
+- Highlight 5-10 coins with market caps between $10M and $500M (adjustable) that our prediction engine flags as high-potential.
+- Display:
+  - Coin name and ticker.
+  - Current price and Timeframe Change % (for the user’s last selected timeframe in the trading pair table).
+  - Volume Change % (e.g., "+35.00%" or "N/A") for the same timeframe, with a tooltip showing the trend.
+  - Predicted timeframe of peak performance (e.g., "Next 4h" or "Next 1d").
+  - Why it’s picked (e.g., "Rising X sentiment, Volume Change %: +200.00% in last 1h").
+  - Mini heatmap showing momentum trend for the selected timeframe.
+- **Backend:** Raw data stored in Vercel Postgres, Volume Change % and Timeframe Change % calculated and displayed dynamically.
 
-- **Result:**
-- If prediction is accurate, Confidence Score will be 90%+.
-- If prediction is poor, it will drop below 50%.
-- Automatically highlight the top predictions based on Confidence Score.
+### 4. Intuitive UI Design
+Create a clean, trader-friendly UI to display the above features:
+- **Dashboard Layout:**
+  - **Left Panel:** Trading Pair Table (scrollable, with timeframe selector at the top).
+  - **Center Panel:** Prediction Engine Outputs (tabbed by timeframe: 15m, 30m, 1h, 4h, 1d).
+  - **Right Panel:** Top Picks Section (reflecting the last selected timeframe from the trading pair table).
+  - **Top Bar:** Real-time market overview (e.g., "Total crypto market cap: $X, 24h change: +Y%").
 
-### ✅ **1.3 Adaptive Learning Mechanism (Self-Improving AI)**
-- Implement a feedback loop where the app learns from its past mistakes.
-- **How it works:**
-1. If a prediction was wrong, adjust the model weights.
-2. If a prediction was correct, reinforce the same pattern.
-3. Automatically increase prediction accuracy over time.
+- **Prediction Section UI:**
+  - For each timeframe tab (e.g., 1d):
+    - **Header:** "1d Predictions (Made at 9:00 AM JST, March 08, 2025)".
+    - **Table:** 
+      - Column 1: "Predicted Top Gainers" (coin name, predicted % gain, confidence, Volume Change %).
+      - Column 2: "Actual Performance" (e.g., "Since 9:00 AM JST, up 8%, Volume Change %: +20.00% as of 11:00 AM JST").
+      - Column 3: "Actual Top Gainers Today" (e.g., "X coin, +15%, Volume Change %: +75.00% since 9:00 AM JST").
+    - **Visuals:** Small sparkline charts showing predicted vs. actual price trend and Volume Change % for the timeframe.
 
-- **Expected Impact:**
-- Prediction accuracy will consistently improve every day.
-- The app will eventually become **unstoppable** in its accuracy.
+- **Heatmaps and Tooltips:**
+  - Embed heatmaps in the trading pair table and top picks section, reflecting Timeframe Change % and Volume Change % for the selected timeframe.
+  - Tooltips on hover (e.g., for 1h: "Volume Change %: +45.00% – Volume spiked from $500K to $725K in last hour").
 
-### ✅ **1.4 Eliminate Mock/Dummy Data**
-- Completely remove any mock/dummy data from the app.
-- Connect to **real-time Binance USDT pairs** data.
-- Ensure no inactive or invalid pairs are shown.
+### 5. Additional Features
+- **Alerts:** Option to set alerts based on Timeframe Change % or Volume Change % for any timeframe (e.g., "Notify me if Volume Change % exceeds +50% in 1h").
+- **Sentiment Insights:** Integrate X post analysis (e.g., "Positive sentiment up 30%, Volume Change %: +45.00% in last 4h").
+- **Exportable Data:** Export the trading pair table or predictions as CSV, including Timeframe Change % and Volume Change % for the selected timeframe.
 
-### ✅ **1.5 Prediction vs Reality Tracker**
-- Implement a new section that shows:
-  - **What our app predicted.**
-  - **What actually happened.**
-- This will allow us to analyze our app's prediction accuracy.
-- Use color codes (green = accurate, red = poor) for clarity.
+### Data Handling
+- **Backend:** Store raw data (price, volume, etc.) in Vercel Postgres with timestamps for all tracked coins. Calculate timeframe-specific metrics (e.g., Timeframe Change %, Volume Change %, Volatility Score) server-side, handling edge cases (e.g., Old Volume = 0 returns `N/A`).
+- **Frontend:** Display calculated values dynamically based on the selected timeframe, prioritizing % changes over raw data.
 
-### ✅ **1.6 Top Picks Section (Data-driven)**
-- Fix the "Top Picks" section by eliminating randomness.
-- Use logic to display the most promising pairs based on:
-  - **Prediction Confidence Score.**
-  - **Market volatility.**
-  - **Volume and liquidity.**
-- Add a brief insight (1-2 sentences) explaining why each pick is promising.
-
-### ✅ **Expected Outcome:**
-- **Accuracy should increase by at least 20-30%.**
-- **Predictions should feel powerful and reliable.**
-- We should be able to monitor live accuracy and improve performance continuously.
-
----
-
-## **Phase 2: Real-time Market Analysis (Game Changer)**
-
-### ✅ **2.1 Live Market Monitoring Section**
-- Build a new section called **"Live Market Tracker"**.
-- Show real-time price changes, major volatility shifts, and high-liquidity opportunities.
-- Pull data directly from **Binance USDT pairs**.
-
-### ✅ **2.2 Prediction vs Reality Dashboard**
-- Create a dashboard that shows:
-  - **Predicted Price** vs **Actual Price**.
-  - **% Accuracy.**
-  - **Market changes.**
-- Users can filter by time frame (1 min, 5 min, 1 hour, 24 hours, etc.).
-
-### ✅ **2.3 Historical Accuracy Report**
-- Add a section where users can see:
-  - **Past Predictions.**
-  - **Actual Market Movements.**
-  - **Our App's Accuracy History.**
-- This will act as a performance benchmark for the app.
-
-### ✅ **2.4 Error Correction Algorithm**
-- **Implement a Smart Error Correction System.**
-- **How it works:**
-  - If the app predicts a price movement wrong (based on historical data), the app should use **back-propagation learning** to reduce future errors.
-  - Automatically adjust weights when predictions deviate from reality.
-- **Result:**
-  - The app will become significantly accurate over time with less deviation.
-
-### ✅ **Expected Outcome:**
-- Users can visually see how accurate our app is.
-- We can use this data to keep improving the model.
-- Our app will build trust by showing transparent historical performance.
+### Goal
+The dashboard should be a one-stop tool for crypto day traders, providing real-time, timeframe-flexible data, actionable predictions, and a focus on low-cap gems with high growth potential. The multi-timeframe trading pair table enhances usability by allowing traders to analyze trends and metrics across different periods seamlessly.
 
 ---
 
-## **Phase 3: UI/UX Transformation (Make It Premium)**
+### Key Changes Made
+1. **Multi-Timeframe Trading Pair Table:** Added a timeframe selector (15m, 30m, 1h, 4h, 1d) and updated all columns to reflect the chosen timeframe:
+   - "24h Change %" → "Timeframe Change %".
+   - "Volume Change % (24h)" → "Volume Change %" for the selected timeframe.
+   - Volatility Score, Liquidity, Prediction Confidence, and Heatmap Indicator now adjust to the timeframe.
+2. **Dynamic Data:** Ensured all columns update dynamically based on the selected timeframe, with backend support in Vercel Postgres for raw data storage and calculations.
+3. **Top Picks Integration:** Linked the Top Picks section to reflect the last selected timeframe from the trading pair table for consistency.
+4. **UI Adjustments:** Added the timeframe selector to the table and ensured tooltips and heatmaps align with the chosen period.
 
-### ✅ **3.1 Design Overhaul**
-- Completely polish the app design to look luxurious and premium.
-- Use Glassmorphism, subtle gradients, and minimalistic UI elements.
-- Ensure consistency in color, typography, and spacing.
-
-### ✅ **3.2 Micro-interactions**
-- Implement subtle micro-interactions like:
-  - Hover effects.
-  - Button ripple effects.
-  - Smooth data pop-ins.
-- This will make the app feel high-end and professional.
-
-### ✅ **3.3 Liquid Waterflow Data Update Effect**
-- When new market data comes in, use a "liquid waterflow" transition.
-- This will make the app feel alive and visually premium.
-
-### ✅ **3.4 Top Picks Visual Refinement**
-- Redesign the Top Picks section to look like a premium trading dashboard.
-- Add subtle color changes when the market moves rapidly.
-- Implement a compact summary of why a pair is promising.
-
-### ✅ **Expected Outcome:**
-- The app will look and feel like a world-class prediction platform.
-- Users will emotionally connect with the premium experience.
-
----
-
-## **Phase 4: Performance & Optimization**
-
-### ✅ **4.1 Real-time Data Sync**
-- Ensure data updates every **5 seconds** without lag.
-- Avoid unnecessary API calls to reduce load time.
-
-### ✅ **4.2 Fast Rendering of Predictions**
-- Optimize the rendering process to ensure the app feels fast.
-- Implement lazy-loading for charts and data-heavy elements.
-
-### ✅ **4.3 Stress Test**
-- Simulate high-traffic conditions.
-- Ensure the app can handle thousands of concurrent users.
-- Eliminate crashes, freezes, or bugs.
-
-### ✅ **Expected Outcome:**
-- App performs with ultra-smooth responsiveness.
-- Predictions load instantly without lag.
-
----
-
-## ✅ Final Deliverable:
-- **Market-leading prediction accuracy (>90%).**
-- **Premium app design with high-end micro-interactions.**
-- **Live prediction vs actual tracking dashboard.**
-- **Smooth, real-time data updates with liquid waterflow effect.**
-- **Zero mock/dummy data. 100% live Binance USDT pairs.**
-
-**🚀 Instruction for Bolt.new:**
-1. **Focus entirely on Phase 1 (Prediction Accuracy) first.**
-2. Once Phase 1 reaches 90%+ accuracy, move to Phase 2 (Real-time Market Analysis).
-3. Then enhance the UI/UX in Phase 3 to make it feel world-class.
-4. Optimize performance in Phase 4.
-
-**Key Success Metrics:**
-- Prediction Accuracy > 90%.
-- Prediction Confidence Score that users can trust.
-- Premium-level app experience.
-- Real-time accurate market comparison.
-- Seamless performance under high traffic.
-
+This version provides a flexible, timeframe-aware trading pair table that enhances the dashboard’s utility for day traders. Let me know if you’d like further adjustments!
