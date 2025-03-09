@@ -56,8 +56,11 @@ const TopGainersCarousel: React.FC<TopGainersCarouselProps> = ({
   }, [gainers.length, isHistoricalView]);
 
   // Format helpers
-  const formatChangePercent = (value: number): string => {
-    return value > 0 ? `+${value.toFixed(2)}%` : `${value.toFixed(2)}%`;
+  const formatChangePercent = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return '--';
+    const numericValue = Number(value);
+    if (isNaN(numericValue)) return '--';
+    return numericValue > 0 ? `+${numericValue.toFixed(2)}%` : `${numericValue.toFixed(2)}%`;
   };
 
   const getColorClass = (value: number): string => {

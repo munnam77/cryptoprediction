@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MarketData } from '../services/BinanceService';
+import type { MarketData, TimeFrame } from '../types/binance';
 import TimeframeSelector from './TimeframeSelector';
-import TradingDashboard from './TradingDashboard';
 import PredictionDashboard from './PredictionDashboard';
 import TopPicksCarousel from './TopPicksCarousel';
 import TopGainersCarousel from './TopGainersCarousel';
@@ -20,8 +19,6 @@ import MicroRSIBar from './MicroRSIBar';
 import TimeframeRewindSlider from './TimeframeRewindSlider';
 import CorrelationHeatDot from './CorrelationHeatDot';
 import LoadingSkeleton from './LoadingSkeleton';
-import MarketMoodOrb from './MarketMoodOrb';
-import BTCRippleLine from './BTCRippleLine';
 import AudioPing from './AudioPing';
 
 interface MainLayoutProps {
@@ -29,19 +26,22 @@ interface MainLayoutProps {
   marketVolatility: number;
   btcChangePercent: number;
   marketChangePercent: number;
-  selectedTimeframe: '15m' | '30m' | '1h' | '4h' | '1d';
-  onTimeframeChange: (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => Promise<void>;
+  selectedTimeframe: TimeFrame;
+  onTimeframeChange: (timeframe: TimeFrame) => void;
   topGainers: MarketData[];
   lowCapGems: MarketData[];
   allMarketData: MarketData[];
   isLoading: boolean;
+  availableFeatures: {
+    marketData: boolean;
+    predictions: boolean;
+    topGainers: boolean;
+    lowCapGems: boolean;
+    alerts: boolean;
+  };
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({
-  marketSentiment,
-  marketVolatility,
-  btcChangePercent,
-  marketChangePercent,
   selectedTimeframe,
   onTimeframeChange,
   topGainers,
@@ -55,10 +55,27 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const [historicalTimestamp, setHistoricalTimestamp] = useState<number>(Date.now());
   const [isHistoricalView, setIsHistoricalView] = useState<boolean>(false);
 
+  // Helper to parse trading pair symbol
+  const parseSymbol = (symbol: string) => {
+    const quoteAsset = symbol.slice(-4);  // USDT is 4 chars
+    const baseAsset = symbol.slice(0, -4);
+    return { baseAsset, quoteAsset };
+  };
+
+  // Format helpers
+  const formatChangePercent = (value: number | undefined | null) => {
+    if (value === undefined || value === null) return '0.00%';
+    return value > 0 ? `+${value.toFixed(2)}%` : `${value.toFixed(2)}%`;
+  };
+
+  const getColorClass = (value: number | undefined | null) => {
+    if (value === undefined || value === null) return 'text-gray-400';
+    return value > 0 ? 'text-green-400' : value < 0 ? 'text-red-400' : 'text-gray-400';
+  };
+
   // Update selectedPair when allMarketData changes
   useEffect(() => {
     if (selectedPair && allMarketData.length > 0) {
-      // Find the updated version of the selected pair
       const updatedPair = allMarketData.find(pair => pair.symbol === selectedPair.symbol);
       if (updatedPair) {
         setSelectedPair(updatedPair);
@@ -66,20 +83,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     }
   }, [allMarketData]);
 
-  // Format helpers
-  const formatChangePercent = (value: number) => {
-    return value > 0 ? `+${value.toFixed(2)}%` : `${value.toFixed(2)}%`;
-  };
-
-  const getColorClass = (value: number) => {
-    return value > 0 ? 'text-green-400' : value < 0 ? 'text-red-400' : 'text-gray-400';
-  };
-
   // Trading pair selection handler
   const handlePairSelect = (pair: MarketData) => {
     setSelectedPair(pair);
-    // Optional: Play audio ping when selecting a pair with high volatility
-    if (audioPingEnabled && pair.volatility && pair.volatility > 70) {
+    // Play audio ping when selecting a pair with high volatility
+    if (audioPingEnabled && (pair.volatility || 0) > 70) {
       const audioElement = document.getElementById('audioPing') as HTMLAudioElement;
       if (audioElement) audioElement.play();
     }
@@ -113,6 +121,107 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     // This would typically involve API calls to get snapshots from that time
     console.log(`Viewing data from: ${new Date(timestamp).toLocaleString()}`);
   };
+
+  // Update trading pair table section to use correct prop types
+  const renderTradingPairRow = (pair: MarketData) => {
+    const { baseAsset, quoteAsset } = parseSymbol(pair.symbol);
+    const isHighVolatility = (pair.volatility || 0) > 80;
+    
+    return (
+      <tr 
+        key={pair.symbol}
+        className={`border-b border-gray-700/50 hover:bg-gray-700/50 cursor-pointer ${
+          selectedPair?.symbol === pair.symbol ? 'bg-gray-700/50' : ''
+        } ${isHighVolatility ? 'bg-orange-900/20' : ''}`}
+        onClick={() => handlePairSelect(pair)}
+      >
+        <td className="px-2 py-2 relative">
+          <div className="flex items-center">
+            <span className="font-medium">{baseAsset}</span>
+            <span className="ml-1 text-xs text-gray-400">{quoteAsset}</span>
+            {pair.breakout && (
+              <BreakoutAlert 
+                breakout={pair.breakout}
+                currentPrice={pair.price}
+                className="ml-1"
+              />
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-2 text-right">
+          <div className="flex items-center justify-end">
+            ${pair.price.toFixed(pair.price < 1 ? 6 : 2)}
+            {pair.pivotPoint && (
+              <PricePivotDot 
+                pivotPoint={pair.pivotPoint}
+                currentPrice={pair.price}
+                className="ml-1 w-2 h-2" 
+              />
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-2 text-right">
+          <span className={getColorClass(pair.priceChangePercent)}>
+            {formatChangePercent(pair.priceChangePercent)}
+          </span>
+          {pair.trend && (
+            <TrendStrengthIcon
+              trend={pair.trend.direction === 'up' ? 'bull' : 'bear'}
+              strength={Math.ceil(pair.trend.strength / 33) as 1 | 2 | 3}
+              className="ml-1 inline-block"
+            />
+          )}
+        </td>
+        <td className="px-2 py-2 text-right">
+          <span className={getColorClass(pair.volumeChangePercent)}>
+            {formatChangePercent(pair.volumeChangePercent)}
+          </span>
+          <VolatilityRangeBar
+            volatility={pair.volatility || 0}
+            price={pair.price}
+            className="mt-1 w-full h-1"
+          />
+        </td>
+        <td className="px-2 py-2">
+          <div className="flex items-center justify-end space-x-2">
+            <OrderBookImbalanceTag 
+              imbalance={pair.orderBookImbalance || 50}
+              volume={pair.volume}
+            />
+            <CustomTriggerPin 
+              symbol={pair.symbol}
+              onClick={() => console.log(`Set alert for ${pair.symbol}`)}
+            />
+          </div>
+          {pair.tradingZones && (
+            <TradersHotZone 
+              zones={pair.tradingZones}
+              currentPrice={pair.price}
+              className="w-full h-1 mt-1"
+            />
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+  // Update trading pair table section
+  const renderTradingPairTable = () => (
+    <table className="w-full table-fixed">
+      <thead>
+        <tr className="text-xs text-gray-400 border-b border-gray-700">
+          <th className="px-2 py-2 text-left w-[24%]">Pair</th>
+          <th className="px-2 py-2 text-right w-[17%]">Price</th>
+          <th className="px-2 py-2 text-right w-[20%]">{selectedTimeframe} Chg%</th>
+          <th className="px-2 py-2 text-right w-[20%]">Vol Chg%</th>
+          <th className="px-2 py-2 text-right w-[19%]">Features</th>
+        </tr>
+      </thead>
+      <tbody>
+        {allMarketData.map(renderTradingPairRow)}
+      </tbody>
+    </table>
+  );
 
   return (
     <div className="flex flex-col min-h-screen bg-transparent text-gray-100 px-4 py-2">
@@ -150,109 +259,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               />
             </h2>
             
-            {/* Trading Pair Table with all 7 features from context.md */}
             {isLoading ? (
               <LoadingSkeleton type="table" rows={10} />
             ) : (
               <div className="overflow-auto max-h-[calc(100vh-180px)]">
-                <table className="w-full table-fixed">
-                  <thead>
-                    <tr className="text-xs text-gray-400 border-b border-gray-700">
-                      <th className="px-2 py-2 text-left w-[24%]">Pair</th>
-                      <th className="px-2 py-2 text-right w-[17%]">Price</th>
-                      <th className="px-2 py-2 text-right w-[20%]">{selectedTimeframe} Chg%</th>
-                      <th className="px-2 py-2 text-right w-[20%]">Vol Chg%</th>
-                      <th className="px-2 py-2 text-right w-[19%]">Features</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allMarketData.map((pair, index) => (
-                      <tr 
-                        key={pair.symbol}
-                        className={`border-b border-gray-700/50 hover:bg-gray-700/50 cursor-pointer ${
-                          selectedPair?.symbol === pair.symbol ? 'bg-gray-700/50' : ''
-                        } ${pair.volatility && pair.volatility > 80 ? 'bg-orange-900/20' : ''}`}
-                        onClick={() => handlePairSelect(pair)}
-                      >
-                        <td className="px-2 py-2 relative">
-                          <div className="flex items-center">
-                            <span className="font-medium">{pair.baseAsset}</span>
-                            <span className="ml-1 text-xs text-gray-400">/{pair.quoteAsset}</span>
-                            {/* Feature 1: Breakout Alert Badge */}
-                            {pair.breakout && (
-                              <BreakoutAlert 
-                                price={pair.breakout.price}
-                                type={pair.breakout.type}
-                                className="ml-1"
-                              />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <div className="flex items-center justify-end">
-                            ${pair.price.toFixed(pair.price < 1 ? 6 : 2)}
-                            {/* Feature 6: Price Pivot Dot */}
-                            {pair.pivotPoint && (
-                              <PricePivotDot 
-                                currentPrice={pair.price} 
-                                pivotPrice={pair.pivotPoint.price}
-                                className="ml-1 w-2 h-2" 
-                              />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <span className={getColorClass(pair.priceChangePercent)}>
-                            {formatChangePercent(pair.priceChangePercent)}
-                          </span>
-                          {/* Feature 3: Trend Strength Icon */}
-                          {pair.trend && (
-                            <TrendStrengthIcon
-                              trend={pair.trend.direction === 'up' ? 'bull' : 'bear'}
-                              strength={Math.ceil(pair.trend.strength / 33) as 1 | 2 | 3}
-                              className="ml-1 inline-block"
-                            />
-                          )}
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <span className={getColorClass(pair.volumeChangePercent)}>
-                            {formatChangePercent(pair.volumeChangePercent)}
-                          </span>
-                          {/* Feature 2: Volatility Range Bar */}
-                          <VolatilityRangeBar
-                            volatility={pair.volatility || 0}
-                            volatilityRange={[pair.price * 0.99, pair.price * 1.01]}
-                            className="mt-1 w-full h-1"
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="flex items-center justify-end space-x-2">
-                            {/* Feature 4: Order Book Imbalance Tag */}
-                            <OrderBookImbalanceTag 
-                              ratio={pair.orderBookImbalance || 50}
-                              volume={pair.volume}
-                            />
-                            
-                            {/* Feature 7: Custom Trigger Pin */}
-                            <CustomTriggerPin 
-                              symbol={pair.symbol}
-                              onClick={() => console.log(`Set alert for ${pair.symbol}`)}
-                            />
-                          </div>
-                          
-                          {/* Feature 5: Trader's Hot Zone */}
-                          {index < 5 && pair.tradingZones && (
-                            <TradersHotZone 
-                              zones={pair.tradingZones}
-                              currentPrice={pair.price}
-                              className="w-full h-1 mt-1"
-                            />
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {renderTradingPairTable()}
               </div>
             )}
           </div>
@@ -289,7 +300,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               
               {/* Feature 11: Scalper's Profit Target */}
               <ScalpersProfitTarget 
-                target={`${selectedPair?.profitTarget || 5}%`}
+                value={selectedPair?.profitTarget || 5}
                 timeframe={selectedTimeframe}
                 className="w-1/3"
               />
@@ -332,8 +343,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               <div className="p-2 bg-gray-700 bg-opacity-40 rounded">
                 <h4 className="text-xs text-gray-400 mb-1">BTC Correlation</h4>
                 <CorrelationHeatDot 
-                  correlation={selectedPair?.btcCorrelation || 0}
-                  assets={[selectedPair?.symbol?.replace('USDT', '') || 'Unknown', 'BTC']}
+                  value={selectedPair?.btcCorrelation || 0}
+                  baseAsset={selectedPair?.baseAsset || 'Unknown'}
                   className="w-full h-4"
                 />
               </div>

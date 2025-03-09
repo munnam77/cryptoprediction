@@ -26,6 +26,12 @@ const VolatilityVolumeCorrelationDot: React.FC<VolatilityVolumeCorrelationDotPro
   // where anything beyond +/-100% is capped
   const normalizedVolumeChange = Math.min(Math.max(volumeChange / 100, -1), 1);
   
+  // Safely format number with fallback
+  const formatNumber = (num: number | undefined): string => {
+    if (typeof num !== 'number' || isNaN(num)) return '0';
+    return num.toFixed(2);
+  };
+
   // Calculate position
   const xPos = 5 + normalizedVolatility * (width - 10); // x-axis is volatility
   const yPos = height - 5 - ((normalizedVolumeChange + 1) / 2) * (height - 10); // y-axis is volume change
@@ -52,7 +58,7 @@ const VolatilityVolumeCorrelationDot: React.FC<VolatilityVolumeCorrelationDotPro
   const dotSize = 3 + normalizedVolatility * 5;
   
   // Tooltip content
-  const tooltipContent = `Volatility: ${volatility}%, Volume Change: ${volumeChange.toFixed(2)}%
+  const tooltipContent = `Volatility: ${formatNumber(volatility)}%, Volume Change: ${formatNumber(volumeChange)}%
 ${correlation > 0.6 ? 'High correlation' : correlation < -0.6 ? 'Negative correlation' : 'Moderate correlation'}`;
   
   return (

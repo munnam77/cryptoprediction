@@ -344,7 +344,7 @@ export class StressTestService {
               
               // Simulate typical user actions
               await Promise.all([
-                BinanceService.getInstance().getMarketData('BTCUSDT', '1h'),
+                BinanceService.getMarketData('BTCUSDT'),
                 PredictionService.getInstance().getPrediction('BTCUSDT', '1h'),
                 this.validationService.validateMarketData('BTCUSDT', '1h')
               ]);

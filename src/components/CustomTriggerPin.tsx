@@ -4,6 +4,7 @@ import { Pin, Bell, X } from 'lucide-react';
 interface CustomTriggerPinProps {
   symbol: string;
   onSetAlert?: (settings: AlertSettings) => void;
+  onClick?: (symbol: string) => void;  // Add onClick handler
   className?: string;
 }
 
@@ -22,6 +23,7 @@ export interface AlertSettings {
 const CustomTriggerPin: React.FC<CustomTriggerPinProps> = ({
   symbol,
   onSetAlert,
+  onClick,
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,6 +34,14 @@ const CustomTriggerPin: React.FC<CustomTriggerPinProps> = ({
     value: 0,
     notificationType: ['app']
   });
+
+  // Handle pin click with both panel toggle and external handler
+  const handleClick = () => {
+    togglePanel();
+    if (onClick) {
+      onClick(symbol);
+    }
+  };
   
   // Toggle settings panel
   const togglePanel = () => {
@@ -76,7 +86,7 @@ const CustomTriggerPin: React.FC<CustomTriggerPinProps> = ({
   return (
     <div className={`relative ${className}`}>
       <button
-        onClick={togglePanel}
+        onClick={handleClick}
         className="text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
         title="Set custom alert"
       >

@@ -3,140 +3,53 @@
  * Provides functions to interact with the Binance API for real cryptocurrency data
  */
 
-// Types for Binance API responses
-export interface BinanceTicker {
-  symbol: string;
-  priceChange: string;
-  priceChangePercent: string;
-  weightedAvgPrice: string;
-  prevClosePrice: string;
-  lastPrice: string;
-  lastQty: string;
-  bidPrice: string;
-  bidQty: string;
-  askPrice: string;
-  askQty: string;
-  openPrice: string;
-  highPrice: string;
-  lowPrice: string;
-  volume: string;
-  quoteVolume: string;
-  openTime: number;
-  closeTime: number;
-  firstId: number;
-  lastId: number;
-  count: number;
-}
-
-export interface BinanceSymbolInfo {
-  symbol: string;
-  status: string;
-  baseAsset: string;
-  baseAssetPrecision: number;
-  quoteAsset: string;
-  quotePrecision: number;
-  quoteAssetPrecision: number;
-  orderTypes: string[];
-  icebergAllowed: boolean;
-  ocoAllowed: boolean;
-  isSpotTradingAllowed: boolean;
-  isMarginTradingAllowed: boolean;
-  filters: any[];
-  permissions: string[];
-}
-
-export interface BinanceKline {
-  openTime: number;
-  open: string;
-  high: string;
-  low: string;
-  close: string;
-  volume: string;
-  closeTime: number;
-  quoteAssetVolume: string;
-  trades: number;
-  takerBuyBaseAssetVolume: string;
-  takerBuyQuoteAssetVolume: string;
-}
-
-export interface MarketData {
-  symbol: string;
-  baseAsset: string;
-  quoteAsset: string;
-  price: number;
-  priceChangePercent: number;
-  volume: number;
-  volumeChangePercent: number;
-  marketCap?: number;
-  historicalData?: BinanceKline[];
-  volatility?: number;
-  liquidity?: number;
-  // Break alerts
-  breakout?: {
-    price: number;
-    type: 'resistance' | 'support';
-    time: number;
-  };
-  // Trend data
-  trend?: {
-    direction: 'up' | 'down' | 'sideways';
-    strength: number; // 0-100
-    duration: number; // In minutes
-  };
-  // Support/Resistance pivot points
-  pivotPoint?: {
-    price: number;
-    type: 'support' | 'resistance';
-    strength: number; // 0-100
-  };
-  // Order book imbalance
-  orderBookImbalance?: number; // 0-100, higher means more buy orders
-  // Trading zones for hot zone visualization
-  tradingZones?: {
-    price: number;
-    intensity: number; // 0-100
-  }[];
-  // RSI value
-  rsi?: number; // 0-100
-  // BTC correlation
-  btcCorrelation?: number; // -100 to 100
-  // Pump probability
-  pumpProbability?: number; // 0-100
-  // Price velocity
-  priceVelocity?: number; // Price change per second
-  priceVelocityTrend?: 'accelerating' | 'decelerating' | 'stable';
-  // Profit target
-  profitTarget?: number; // Percentage
-  // For Whale Tail icon feature
-  whaleActivity?: {
-    action: 'buy' | 'sell';
-    amount: number;
-    time: number;
-  };
-  // For historical prediction accuracy
-  previousPrediction?: {
-    priceTarget: number;
-    confidence: number;
-    timestamp: number;
-    actualOutcome: number;
-  };
-  // For streak counter
-  consecutiveGains?: number;
-  // Add gemScore for low cap gems calculation
-  gemScore?: number;
-}
+import { BINANCE_CONFIG } from '../config/binance.config';
+import type { BinanceTicker, BinanceSymbolInfo, BinanceKline, MarketData } from '../types/binance';
+import BinanceWebSocketManager from './BinanceWebSocketManager';
 
 // Binance API base URL
 const BINANCE_API_BASE = 'https://api.binance.com/api/v3';
-
-// CoinGecko API for market cap data
 const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3';
+
+// Rate limiting queue
+let requestCount = 0;
+let lastRequestTime = Date.now();
+
+const resetRequestCount = () => {
+  const now = Date.now();
+  if (now - lastRequestTime >= 60000) { // 1 minute
+    requestCount = 0;
+    lastRequestTime = now;
+  }
+};
+
+const checkRateLimit = async () => {
+  resetRequestCount();
+  if (requestCount >= BINANCE_CONFIG.MAX_REQUESTS_PER_MINUTE) {
+    const delay = 60000 - (Date.now() - lastRequestTime);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    resetRequestCount();
+  }
+  requestCount++;
+};
+
+const handleApiError = (error: any, fallbackValue: any = null) => {
+  if (error.response?.status === 429) {
+    console.error('Rate limit exceeded:', error);
+    return new Promise(resolve => 
+      setTimeout(() => resolve(fallbackValue), BINANCE_CONFIG.RETRY_DELAY)
+    );
+  }
+  console.error('API error:', error);
+  return fallbackValue;
+};
 
 /**
  * Get all USDT trading pairs from Binance
  */
 export const getUSDTPairs = async (): Promise<BinanceSymbolInfo[]> => {
   try {
+    await checkRateLimit();
     const response = await fetch(`${BINANCE_API_BASE}/exchangeInfo`);
     const data = await response.json();
     
@@ -144,11 +57,11 @@ export const getUSDTPairs = async (): Promise<BinanceSymbolInfo[]> => {
     return data.symbols.filter((symbol: BinanceSymbolInfo) => 
       symbol.quoteAsset === 'USDT' && 
       symbol.status === 'TRADING' &&
-      symbol.isSpotTradingAllowed
+      symbol.isSpotTradingAllowed &&
+      !BINANCE_CONFIG.BLACKLISTED_PAIRS.includes(symbol.baseAsset)
     );
   } catch (error) {
-    console.error('Error fetching USDT pairs:', error);
-    return [];
+    return handleApiError(error, []);
   }
 };
 
@@ -157,6 +70,7 @@ export const getUSDTPairs = async (): Promise<BinanceSymbolInfo[]> => {
  */
 export const get24hrTickers = async (symbol?: string): Promise<BinanceTicker[]> => {
   try {
+    await checkRateLimit();
     const url = symbol 
       ? `${BINANCE_API_BASE}/ticker/24hr?symbol=${symbol}` 
       : `${BINANCE_API_BASE}/ticker/24hr`;
@@ -166,8 +80,7 @@ export const get24hrTickers = async (symbol?: string): Promise<BinanceTicker[]> 
     
     return Array.isArray(data) ? data : [data];
   } catch (error) {
-    console.error('Error fetching 24hr tickers:', error);
-    return [];
+    return handleApiError(error, []);
   }
 };
 
@@ -183,6 +96,7 @@ export const getKlines = async (
   limit: number = 100
 ): Promise<BinanceKline[]> => {
   try {
+    await checkRateLimit();
     const response = await fetch(
       `${BINANCE_API_BASE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
     );
@@ -203,8 +117,7 @@ export const getKlines = async (
       takerBuyQuoteAssetVolume: kline[10]
     }));
   } catch (error) {
-    console.error(`Error fetching klines for ${symbol}:`, error);
-    return [];
+    return handleApiError(error, []);
   }
 };
 
@@ -214,6 +127,7 @@ export const getKlines = async (
  */
 export const getMarketCapData = async (coinIds: string[]): Promise<Record<string, number>> => {
   try {
+    await checkRateLimit();
     const ids = coinIds.join(',');
     const response = await fetch(
       `${COINGECKO_API_BASE}/coins/markets?vs_currency=usd&ids=${ids}&per_page=250&page=1&sparkline=false`
@@ -228,8 +142,7 @@ export const getMarketCapData = async (coinIds: string[]): Promise<Record<string
     
     return marketCaps;
   } catch (error) {
-    console.error('Error fetching market cap data:', error);
-    return {};
+    return handleApiError(error, {});
   }
 };
 
@@ -262,9 +175,9 @@ export const calculateVolatility = (klines: BinanceKline[]): number => {
 /**
  * Calculate liquidity score based on volume and bid/ask spread
  * @param ticker Ticker data with volume
- * @param normalizedVolume Volume normalized to 0-100 scale
+ * @param volume Volume normalized to 0-100 scale
  */
-export const calculateLiquidity = (ticker: BinanceTicker, normalizedVolume: number): number => {
+export const calculateLiquidity = (ticker: BinanceTicker, volume: number): number => {
   const bidPrice = parseFloat(ticker.bidPrice);
   const askPrice = parseFloat(ticker.askPrice);
   
@@ -276,7 +189,7 @@ export const calculateLiquidity = (ticker: BinanceTicker, normalizedVolume: numb
   const spreadScore = Math.min(100, Math.max(0, 100 - (spread * 50)));
   
   // Combine volume and spread scores (weighted)
-  return spreadScore * 0.7 + normalizedVolume * 0.3;
+  return spreadScore * 0.7 + volume * 0.3;
 };
 
 /**
@@ -520,8 +433,8 @@ export const calculateProfitTarget = (
 export const detectBreakouts = (
   klines: BinanceKline[],
   currentPrice: number
-): { price: number; type: 'resistance' | 'support'; time: number } | null => {
-  if (klines.length < 10) return null;
+): { price: number; type: 'resistance' | 'support'; time: number; } | undefined => {
+  if (klines.length < 10) return undefined;
   
   // Find recent highs and lows
   const recentHigh = Math.max(...klines.slice(-10).map(k => parseFloat(k.high)));
@@ -552,7 +465,7 @@ export const detectBreakouts = (
     };
   }
   
-  return null;
+  return undefined;
 };
 
 /**
@@ -643,18 +556,18 @@ export const getComprehensiveMarketData = async (
       const breakout = detectBreakouts(klines, parseFloat(ticker.lastPrice));
       
       // Determine trend direction and strength
-      let trend = {
+      let trendDetails = {
         direction: 'sideways' as 'up' | 'down' | 'sideways',
         strength: 0,
         duration: 0
       };
       
       if (parseFloat(ticker.priceChangePercent) > 1) {
-        trend.direction = 'up';
-        trend.strength = Math.min(100, parseFloat(ticker.priceChangePercent) * 5);
+        trendDetails.direction = 'up';
+        trendDetails.strength = Math.min(100, parseFloat(ticker.priceChangePercent) * 5);
       } else if (parseFloat(ticker.priceChangePercent) < -1) {
-        trend.direction = 'down';
-        trend.strength = Math.min(100, Math.abs(parseFloat(ticker.priceChangePercent)) * 5);
+        trendDetails.direction = 'down';
+        trendDetails.strength = Math.min(100, Math.abs(parseFloat(ticker.priceChangePercent)) * 5);
       }
       
       // Create market data entry
@@ -676,7 +589,7 @@ export const getComprehensiveMarketData = async (
         pumpProbability,
         profitTarget,
         breakout,
-        trend,
+        trend: trendDetails,
         // Add a basic pivot point for visualization
         pivotPoint: {
           price: (parseFloat(ticker.highPrice) + parseFloat(ticker.lowPrice)) / 2,
@@ -700,8 +613,7 @@ export const getComprehensiveMarketData = async (
     // Sort by volume (descending)
     return marketData.sort((a, b) => b.volume - a.volume);
   } catch (error) {
-    console.error('Error fetching comprehensive market data:', error);
-    return [];
+    return handleApiError(error, []);
   }
 };
 
@@ -835,14 +747,102 @@ export const getMarketMood = async (): Promise<{
       volatility: normalizedVolatility
     };
   } catch (error) {
-    console.error('Error calculating market mood:', error);
-    return {
+    return handleApiError(error, {
       sentiment: 50,  // Neutral fallback
       btcChangePercent: 0,
       marketChangePercent: 0,
       volatility: 30
-    };
+    });
   }
+};
+
+// Add real-time data handling methods
+/**
+ * Subscribe to real-time market data updates
+ * @param symbols Array of trading pairs to subscribe to
+ * @param onUpdate Callback function for data updates
+ */
+export const subscribeToMarketData = (
+  symbols: string[],
+  onUpdate: (data: MarketData[]) => void
+): void => {
+  const wsManager = BinanceWebSocketManager.getInstance();
+  
+  // Subscribe to 24hr ticker stream for all symbols
+  wsManager.subscribeToDayTicker(async (tickerData) => {
+    // Filter for our symbols and transform data
+    const relevantData = tickerData
+      .filter((ticker: any) => symbols.includes(ticker.s))
+      .map(async (ticker: any) => {
+        // Get historical klines for additional calculations
+        const klines = await getKlines(ticker.s, '1h', 20);
+        
+        // Calculate derived metrics
+        const volatility = calculateVolatility(klines);
+        const volume = parseFloat(ticker.q);
+        const volumeChange = parseFloat(ticker.Q) > 0 
+          ? ((volume - parseFloat(ticker.Q)) / parseFloat(ticker.Q)) * 100 
+          : 0;
+        
+        return {
+          symbol: ticker.s,
+          baseAsset: ticker.s.replace('USDT', ''),
+          quoteAsset: 'USDT',
+          price: parseFloat(ticker.c),
+          priceChangePercent: parseFloat(ticker.P),
+          volume,
+          volumeChangePercent: volumeChange,
+          historicalData: klines,
+          volatility,
+          liquidity: calculateLiquidity({
+            symbol: ticker.s,
+            bidPrice: ticker.b,
+            askPrice: ticker.a,
+            volume: ticker.q
+          } as BinanceTicker, normalizedVolume),
+          rsi: calculateRSI(klines),
+          btcCorrelation: await calculateBTCCorrelation(klines),
+          trend: {
+            direction: parseFloat(ticker.P) > 0 ? 'up' : 'down',
+            strength: Math.abs(parseFloat(ticker.P)) * 5,
+            duration: 1 // Will be updated with historical analysis
+          }
+        } as MarketData;
+      });
+
+    // Wait for all async operations to complete
+    const marketData = await Promise.all(relevantData);
+    onUpdate(marketData);
+  });
+};
+
+/**
+ * Calculate correlation with BTC price movement
+ */
+const calculateBTCCorrelation = async (
+  assetKlines: BinanceKline[]
+): Promise<number> => {
+  const btcKlines = await getKlines('BTCUSDT', '1h', 20);
+  return calculateCorrelation(assetKlines, btcKlines);
+};
+
+/**
+ * Calculate normalized volume (0-100 scale)
+ */
+const normalizedVolume = (volume: number): number => {
+  const minVolume = BINANCE_CONFIG.MINIMUM_VOLUME_24H;
+  const maxVolume = minVolume * 100; // Adjust this based on your needs
+  return Math.min(100, Math.max(0, 
+    ((volume - minVolume) / (maxVolume - minVolume)) * 100
+  ));
+};
+
+/**
+ * Unsubscribe from market data updates
+ */
+export const unsubscribeFromMarketData = (): void => {
+  const wsManager = BinanceWebSocketManager.getInstance();
+  wsManager.close();
 };
 
 // Export the entire service
@@ -862,7 +862,9 @@ const BinanceService = {
   getComprehensiveMarketData,
   getTopGainers,
   getLowCapGems,
-  getMarketMood
+  getMarketMood,
+  subscribeToMarketData,
+  unsubscribeFromMarketData
 };
 
 export default BinanceService;

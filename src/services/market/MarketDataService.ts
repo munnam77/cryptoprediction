@@ -32,17 +32,48 @@ export class MarketDataService {
     // Binance WebSocket for price updates
     const ws = new WebSocket('wss://stream.binance.com:9443/ws/!ticker@arr');
     
+    ws.onopen = () => {
+      console.log('WebSocket connection established');
+      // Subscribe to miniTicker stream for all USDT pairs
+      ws.send(JSON.stringify({
+        method: 'SUBSCRIBE',
+        params: ['!miniTicker@arr'],
+        id: 1
+      }));
+    };
+
     ws.onmessage = (event) => {
       try {
-        const tickers = JSON.parse(event.data);
-        tickers
-          .filter((ticker: any) => ticker.s.endsWith('USDT'))
-          .forEach((ticker: any) => {
-            const symbol = ticker.s;
-            const price = parseFloat(ticker.c);
-            const volume = parseFloat(ticker.v);
-            this.cache.set(`price_${symbol}`, { price, volume, timestamp: Date.now() });
-          });
+        const data = JSON.parse(event.data);
+        
+        // Handle subscription confirmation
+        if (data.result === null && data.id === 1) {
+          console.log('Successfully subscribed to miniTicker stream');
+          return;
+        }
+
+        // Handle ticker updates
+        if (Array.isArray(data)) {
+          data
+            .filter((ticker: any) => ticker.s && ticker.s.endsWith('USDT'))
+            .forEach((ticker: any) => {
+              const symbol = ticker.s;
+              const price = parseFloat(ticker.c);
+              const volume = parseFloat(ticker.v);
+              const priceData = { 
+                price, 
+                volume, 
+                timestamp: Date.now(),
+                priceChange: parseFloat(ticker.p),
+                priceChangePercent: parseFloat(ticker.P),
+                high: parseFloat(ticker.h),
+                low: parseFloat(ticker.l)
+              };
+              this.cache.set(`price_${symbol}`, priceData);
+              // Emit an event for UI updates
+              this.emit('priceUpdate', { symbol, data: priceData });
+            });
+        }
       } catch (error) {
         console.error('WebSocket data parsing error:', error);
       }
@@ -54,6 +85,7 @@ export class MarketDataService {
     };
 
     ws.onclose = () => {
+      console.log('WebSocket connection closed, attempting to reconnect...');
       this.reconnectWebSocket();
     };
 

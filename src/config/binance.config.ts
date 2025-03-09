@@ -8,7 +8,7 @@ export const BINANCE_CONFIG = {
   WS_MAX_RECONNECT_ATTEMPTS: Number(import.meta.env.VITE_WS_MAX_RECONNECT_ATTEMPTS || 5),
   
   // Rate Limiting
-  MAX_REQUESTS_PER_MINUTE: Number(import.meta.env.VITE_API_RATE_LIMIT || 1200),
+  MAX_REQUESTS_PER_MINUTE: Number(import.meta.env.API_RATE_LIMIT || 1200),
   MAX_ORDERS_PER_SECOND: 10,
   
   // USDT Pairs Configuration

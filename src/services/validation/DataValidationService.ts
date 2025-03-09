@@ -1,4 +1,4 @@
-import { BinanceService } from '../binance/BinanceService';
+import BinanceService from '../BinanceService';
 import { CacheService } from '../cache/CacheService';
 import { DatabaseService } from '../database/DatabaseService';
 import { PerformanceMonitor } from '../monitoring/PerformanceMonitor';
@@ -192,7 +192,7 @@ export class DataValidationService {
     try {
       // Get data from different sources
       const [binanceData, cachedData, dbData] = await Promise.all([
-        BinanceService.getInstance().getMarketData(symbol, timeframe),
+        BinanceService.getMarketData(symbol),
         CacheService.getInstance().getMarketData(symbol, timeframe),
         DatabaseService.getInstance().getTimeframeMetrics(symbol, timeframe)
       ]);
@@ -310,7 +310,7 @@ export class DataValidationService {
             '15m': 15 * 60 * 1000,
             '30m': 30 * 60 * 1000,
             '1h': 60 * 60 * 1000,
-            '4h': 4 * 60 * 1000,
+            '4h': 4 * 60 * 60 * 1000, // Fix: Changed from 4 * 60 * 1000 to 4 * 60 * 60 * 1000
             '1d': 24 * 60 * 60 * 1000
           }[timeframe];
 

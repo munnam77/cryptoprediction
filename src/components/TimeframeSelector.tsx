@@ -1,15 +1,16 @@
 import React from 'react';
+import { TimeFrame } from '../types/binance';
 
 interface TimeframeSelectorProps {
-  selectedTimeframe: '15m' | '30m' | '1h' | '4h' | '1d';
-  onTimeframeChange: (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => void;
-  timeframes: ('15m' | '30m' | '1h' | '4h' | '1d')[];
+  selectedTimeframe: TimeFrame;
+  onTimeframeChange: (timeframe: TimeFrame) => void;
+  timeframes: TimeFrame[];
   className?: string;
 }
 
 /**
  * TimeframeSelector Component
- * Renders a tab-based selector for different timeframes as specified in context.md
+ * Renders a tab-based selector for different timeframes
  */
 const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
   selectedTimeframe,
@@ -17,6 +18,15 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
   timeframes,
   className = ''
 }) => {
+  // Map of timeframe labels for display
+  const timeframeLabels: Record<TimeFrame, string> = {
+    '15m': '15m',
+    '30m': '30m',
+    '1h': '1h',
+    '4h': '4h',
+    '1d': '1d'
+  };
+
   return (
     <div className={`inline-flex bg-gray-700 bg-opacity-50 rounded-md ${className}`}>
       {timeframes.map((timeframe) => (
@@ -28,8 +38,9 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
               ? 'bg-indigo-600 text-white border-2 border-indigo-400' 
               : 'text-gray-300 hover:bg-gray-600'
           }`}
+          title={`Switch to ${timeframeLabels[timeframe]} timeframe`}
         >
-          {timeframe}
+          {timeframeLabels[timeframe]}
         </button>
       ))}
     </div>

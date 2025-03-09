@@ -1,87 +1,54 @@
 import React from 'react';
 import { Target } from 'lucide-react';
+import type { TimeFrame } from '../types/binance';
 
 interface ScalpersProfitTargetProps {
-  currentPrice: number;
-  targetPrice: number;
-  stopLoss?: number;
-  timeframe: string;
+  value: number;            // Profit target percentage (e.g., 5 for 5%)
+  timeframe: TimeFrame;     // Time frame for the target
   className?: string;
 }
 
 /**
  * ScalpersProfitTarget Component
- * Shows target price with risk/reward ratio for quick scalps
+ * Shows predicted profit target percentage for quick scalps
  */
 const ScalpersProfitTarget: React.FC<ScalpersProfitTargetProps> = ({
-  currentPrice,
-  targetPrice,
-  stopLoss,
+  value,
   timeframe,
   className = ''
 }) => {
-  // Calculate percentage difference
-  const percentDiff = ((targetPrice - currentPrice) / currentPrice) * 100;
-  
-  // Calculate risk/reward ratio if stopLoss is provided
-  const riskRewardRatio = stopLoss 
-    ? Math.abs((targetPrice - currentPrice) / (currentPrice - stopLoss)).toFixed(1)
-    : null;
-  
-  // Format price based on magnitude
-  const formatPrice = (value: number) => {
-    if (value >= 1000) {
-      return `$${value.toFixed(2)}`;
-    } else if (value >= 1) {
-      return `$${value.toFixed(3)}`;
-    } else if (value >= 0.01) {
-      return `$${value.toFixed(4)}`;
-    } else {
-      return `$${value.toFixed(6)}`;
-    }
-  };
-  
-  // Get color based on target direction
+  // Get color based on value
   const getColor = () => {
-    return targetPrice > currentPrice 
-      ? 'text-green-500 dark:text-green-400' 
-      : 'text-red-500 dark:text-red-400';
+    if (value >= 10) return 'text-green-500 dark:text-green-400';
+    if (value >= 5) return 'text-green-400 dark:text-green-300';
+    if (value >= 2) return 'text-yellow-500 dark:text-yellow-400';
+    return 'text-gray-500 dark:text-gray-400';
   };
   
-  // Get tooltip text
-  const getTooltip = () => {
-    let tooltip = `Target: ${formatPrice(targetPrice)} (${percentDiff.toFixed(2)}%)`;
-    
-    if (stopLoss) {
-      tooltip += `, Stop: ${formatPrice(stopLoss)}, R/R: ${riskRewardRatio}`;
-    }
-    
-    tooltip += ` for ${timeframe}`;
-    return tooltip;
+  // Get recommendation text
+  const getRecommendation = () => {
+    if (value >= 10) return 'Strong Target';
+    if (value >= 5) return 'Good Target';
+    if (value >= 2) return 'Modest Target';
+    return 'Low Target';
   };
   
   return (
     <div 
       className={`flex items-center ${className}`}
-      title={getTooltip()}
+      title={`${value}% profit target predicted for ${timeframe} timeframe`}
     >
       <Target className={`w-4 h-4 mr-1 ${getColor()}`} />
       
       <div className="flex flex-col">
         <div className={`text-sm font-medium ${getColor()}`}>
-          {formatPrice(targetPrice)}
+          +{value}% Target
         </div>
         
-        <div className="flex items-center space-x-2 text-xs">
-          <span className={getColor()}>
-            {percentDiff >= 0 ? '+' : ''}{percentDiff.toFixed(2)}%
+        <div className="flex items-center text-xs">
+          <span className="text-gray-500 dark:text-gray-400">
+            {getRecommendation()}
           </span>
-          
-          {riskRewardRatio && (
-            <span className="text-gray-500 dark:text-gray-400">
-              R/R: {riskRewardRatio}
-            </span>
-          )}
         </div>
       </div>
     </div>

@@ -244,13 +244,19 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
             return 'Medium Cap';
           };
           
-          // Calculate percentiles and risk score
-          const volatilityScore = gem.volatility || 50;
-          const liquidityScore = gem.liquidity || 50;
+          // Calculate volatility score with default fallback
+          const volatilityScore = gem.volatility || 0;
+          const liquidityScore = gem.liquidity || 0;
           const volumeChangePercent = gem.volumeChangePercent || 0;
-          const priceChangePercent = gem.priceChangePercent;
-          const marketCap = gem.marketCap || 50000000; // Default value if undefined
-          
+          const priceChangePercent = gem.priceChangePercent || 0;
+          const marketCap = gem.marketCap || 50000000;
+
+          // Safely format score display
+          const formatScore = (score: number | undefined): string => {
+            if (typeof score !== 'number' || isNaN(score)) return '0';
+            return score.toFixed(0);
+          };
+
           // Risk score (0-100): higher volatility/lower liquidity = higher risk
           const riskScore = Math.min(100, Math.max(0, 
             (volatilityScore * 0.7) + ((100 - liquidityScore) * 0.3)
@@ -309,10 +315,12 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
                   <div>
                     <div className="text-xs text-gray-400 mb-1">Current Price</div>
                     <div className="text-md font-medium">
-                      ${gem.price.toFixed(gem.price < 1 ? 6 : 2)}
+                      ${formatPrice(gem.price || 0)}
                     </div>
                     <div className={`text-xs ${priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%
+                      {priceChangePercent !== undefined && !isNaN(priceChangePercent) ? 
+                        (priceChangePercent >= 0 ? '+' : '') + Number(priceChangePercent).toFixed(2) + '%'
+                        : '--'}
                     </div>
                   </div>
                   
@@ -350,7 +358,7 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-gray-400">Volatility</span>
-                      <span className="text-xs font-medium">{volatilityScore.toFixed(0)}/100</span>
+                      <span className="text-xs font-medium">{formatScore(volatilityScore)}/100</span>
                     </div>
                     <div className="h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
                       <div 
@@ -364,7 +372,7 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-gray-400">Liquidity</span>
-                      <span className="text-xs font-medium">{liquidityScore.toFixed(0)}/100</span>
+                      <span className="text-xs font-medium">{formatScore(liquidityScore)}/100</span>
                     </div>
                     <div className="h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
                       <div 

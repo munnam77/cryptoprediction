@@ -1,33 +1,68 @@
 import React, { useState, useEffect } from 'react';
+import BinanceService from '../services/BinanceService';
+import { useMarketData } from '../hooks/useMarketData';
 import MainLayout from './MainLayout';
 import DynamicBackgroundShift from './DynamicBackgroundShift';
 import TopNavigationBar from './TopNavigationBar';
-import BinanceService from '../services/BinanceService';
-import { MarketData } from '../services/BinanceService';
+import type { MarketData } from '../types/binance';
 
 const AppContainer: React.FC = () => {
+  // Feature detection state
+  const [availableFeatures, _setAvailableFeatures] = useState({
+    marketData: true,
+    predictions: true,
+    topGainers: true,
+    lowCapGems: true,
+    alerts: true
+  });
+
   // Market state
   const [marketState, setMarketState] = useState({
-    sentiment: 65, // 0-100
-    volatility: 45, // 0-100
-    marketChange: 2.5, // percentage
-    btcChangePercent: 1.2,
+    sentiment: 50,
+    volatility: 0,
+    marketChange: 0,
+    btcChangePercent: 0,
     selectedTimeframe: '1h' as '15m' | '30m' | '1h' | '4h' | '1d'
   });
 
-  // Data states
-  const [topGainers, setTopGainers] = useState<MarketData[]>([]);
-  const [lowCapGems, setLowCapGems] = useState<MarketData[]>([]);
-  const [allMarketData, setAllMarketData] = useState<MarketData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dataInitialized, setDataInitialized] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
 
-  // Initial data load
+  // Use our custom hook for real-time market data
+  const { 
+    marketData: allMarketData,
+    isLoading: isMarketDataLoading,
+    error: marketDataError
+  } = useMarketData({
+    symbols: ['BTCUSDT'], // Initial symbol, will be updated with more
+    timeframe: marketState.selectedTimeframe,
+  });
+
+  // Derive top gainers and low cap gems from market data
+  const topGainers = React.useMemo(() => {
+    return allMarketData
+      .filter(data => data.priceChangePercent > 0)
+      .sort((a, b) => b.priceChangePercent - a.priceChangePercent)
+      .slice(0, 10);
+  }, [allMarketData]);
+
+  const lowCapGems = React.useMemo(() => {
+    return allMarketData
+      .filter(data => {
+        const volume = data.volume || 0;
+        return volume > 0 && volume < 10000000; // Filter for low volume as proxy for low market cap
+      })
+      .sort((a, b) => {
+        const scoreA = (a.volatility || 0) * 0.4 + (a.priceChangePercent || 0) * 0.6;
+        const scoreB = (b.volatility || 0) * 0.4 + (b.priceChangePercent || 0) * 0.6;
+        return scoreB - scoreA;
+      })
+      .slice(0, 10);
+  }, [allMarketData]);
+
+  // Fetch and update market mood periodically
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const updateMarketMood = async () => {
       try {
-        // Get market mood data
         const moodData = await BinanceService.getMarketMood();
         setMarketState(prev => ({
           ...prev,
@@ -36,141 +71,70 @@ const AppContainer: React.FC = () => {
           marketChange: moodData.marketChangePercent,
           btcChangePercent: moodData.btcChangePercent
         }));
-
-        // Get initial data for all sections
-        const gainersData = await BinanceService.getTopGainers('1h', 10);
-        if (gainersData.length > 0) {
-          setTopGainers(gainersData);
-        }
-
-        const gemsData = await BinanceService.getLowCapGems('1h', 10);
-        if (gemsData.length > 0) {
-          setLowCapGems(gemsData);
-        }
-
-        const marketData = await BinanceService.getComprehensiveMarketData('1h');
-        if (marketData.length > 0) {
-          setAllMarketData(marketData);
-        }
-
-        setDataInitialized(true);
-        setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching initial data:', error);
-        setError('Failed to load market data. Please try again later.');
-        setIsLoading(false);
+        console.error('Error updating market mood:', error);
       }
     };
 
-    fetchInitialData();
+    // Initial update
+    updateMarketMood();
+
+    // Update every 5 minutes
+    const interval = setInterval(updateMarketMood, 300000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Refresh data periodically
+  // Debug mode keyboard shortcut
   useEffect(() => {
-    if (!dataInitialized) return;
-
-    const refreshInterval = setInterval(async () => {
-      try {
-        // Update market mood
-        const moodData = await BinanceService.getMarketMood();
-        setMarketState(prev => ({
-          ...prev,
-          sentiment: moodData.sentiment,
-          volatility: moodData.volatility,
-          marketChange: moodData.marketChangePercent,
-          btcChangePercent: moodData.btcChangePercent
-        }));
-
-        // Update all data sections
-        const gainersData = await BinanceService.getTopGainers(marketState.selectedTimeframe, 10);
-        if (gainersData.length > 0) {
-          setTopGainers(gainersData);
-        }
-
-        const gemsData = await BinanceService.getLowCapGems(marketState.selectedTimeframe, 10);
-        if (gemsData.length > 0) {
-          setLowCapGems(gemsData);
-        }
-
-        const marketData = await BinanceService.getComprehensiveMarketData(marketState.selectedTimeframe);
-        if (marketData.length > 0) {
-          setAllMarketData(marketData);
-        }
-
-      } catch (error) {
-        console.error('Error refreshing data:', error);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        setDebugMode(!debugMode);
       }
-    }, 60000); // Refresh every minute
-
-    return () => clearInterval(refreshInterval);
-  }, [marketState.selectedTimeframe, dataInitialized]);
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [debugMode]);
 
   // Handle timeframe change
-  const handleTimeframeChange = async (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => {
+  const handleTimeframeChange = (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => {
     setMarketState(prev => ({
       ...prev,
       selectedTimeframe: timeframe
     }));
-
-    try {
-      setIsLoading(true);
-
-      const gainersData = await BinanceService.getTopGainers(timeframe, 10);
-      if (gainersData.length > 0) {
-        setTopGainers(gainersData);
-      }
-
-      const gemsData = await BinanceService.getLowCapGems(timeframe, 10);
-      if (gemsData.length > 0) {
-        setLowCapGems(gemsData);
-      }
-
-      const marketData = await BinanceService.getComprehensiveMarketData(timeframe);
-      if (marketData.length > 0) {
-        setAllMarketData(marketData);
-      }
-
-      setIsLoading(false);
-    } catch (error) {
-      console.error(`Error fetching data for timeframe ${timeframe}:`, error);
-      setError(`Failed to load data for ${timeframe} timeframe.`);
-      setIsLoading(false);
-    }
   };
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md">
-          <h2 className="text-xl font-bold text-red-400 mb-4">Error</h2>
-          <p className="mb-4">{error}</p>
-          <button 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded"
-            onClick={() => window.location.reload()}
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Show any errors in debug mode
+  useEffect(() => {
+    if (marketDataError && debugMode) {
+      console.error('Market data error:', marketDataError);
+    }
+  }, [marketDataError, debugMode]);
 
   return (
     <div className="min-h-screen relative">
-      {/* Dynamic background based on market sentiment */}
       <DynamicBackgroundShift
         marketSentiment={marketState.sentiment}
         volatility={marketState.volatility}
       />
-
-      {/* Top Navigation */}
+      
       <TopNavigationBar
         marketSentiment={marketState.sentiment}
         btcChangePercent={marketState.btcChangePercent}
         marketChangePercent={marketState.marketChange}
       />
 
-      {/* Main layout with all panels */}
+      {debugMode && (
+        <div className="fixed top-16 right-4 z-50 bg-gray-800 bg-opacity-90 text-white p-4 rounded-lg text-sm">
+          <p>Debug Mode Active</p>
+          <p>Market Sentiment: {marketState.sentiment.toFixed(2)}</p>
+          <p>Volatility: {marketState.volatility.toFixed(2)}</p>
+          <p>BTC Change: {marketState.btcChangePercent.toFixed(2)}%</p>
+          <p>Data Points: {allMarketData.length}</p>
+          {marketDataError && <p className="text-red-400">Error: {marketDataError}</p>}
+        </div>
+      )}
+
       <MainLayout 
         marketSentiment={marketState.sentiment}
         marketVolatility={marketState.volatility}
@@ -181,7 +145,8 @@ const AppContainer: React.FC = () => {
         topGainers={topGainers}
         lowCapGems={lowCapGems}
         allMarketData={allMarketData}
-        isLoading={isLoading}
+        isLoading={isMarketDataLoading}
+        availableFeatures={availableFeatures}
       />
     </div>
   );

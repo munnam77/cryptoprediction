@@ -15,9 +15,14 @@ export interface TickerData {
 let ws: WebSocket | null = null;
 let reconnectAttempts = 0;
 let reconnectTimeout: NodeJS.Timeout | null = null;
+let isConnected = false;
 
 // Cache for storing the latest ticker data
 const tickerCache = new Map<string, TickerData>();
+
+// Event handlers for data updates
+type DataUpdateHandler = (data: TickerData[]) => void;
+const dataUpdateHandlers: Set<DataUpdateHandler> = new Set();
 
 function getReconnectDelay(): number {
   // Exponential backoff with jitter
@@ -30,41 +35,44 @@ function getReconnectDelay(): number {
 }
 
 function connectWebSocket() {
+  if (ws && isConnected) {
+    return;
+  }
+
   if (ws) {
     ws.close();
   }
 
-  ws = new WebSocket(BINANCE_WS_BASE);
+  ws = new WebSocket(`${BINANCE_WS_BASE}/!ticker@arr`);
 
   ws.onopen = () => {
     console.log('WebSocket connected');
     reconnectAttempts = 0;
-    // Subscribe to ticker streams
-    if (ws) {
-      ws.send(JSON.stringify({
-        method: 'SUBSCRIBE',
-        params: ['!ticker@arr'],
-        id: 1
-      }));
-    }
+    isConnected = true;
   };
 
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
       if (Array.isArray(data)) {
+        const updatedTickers: TickerData[] = [];
         data.forEach(ticker => {
-          if (!BINANCE_CONFIG.BLACKLISTED_PAIRS.some(pair => ticker.s.endsWith(pair))) {
-            tickerCache.set(ticker.s, {
+          if (ticker.s.endsWith('USDT') && !BINANCE_CONFIG.BLACKLISTED_PAIRS.some(pair => ticker.s.endsWith(pair))) {
+            const tickerData = {
               symbol: ticker.s,
               priceChange: ticker.p,
               priceChangePercent: ticker.P,
               lastPrice: ticker.c,
               volume: ticker.v,
               quoteVolume: ticker.q
-            });
+            };
+            tickerCache.set(ticker.s, tickerData);
+            updatedTickers.push(tickerData);
           }
         });
+        
+        // Notify all registered handlers of the updates
+        dataUpdateHandlers.forEach(handler => handler(updatedTickers));
       }
     } catch (error) {
       console.error('Error processing WebSocket message:', error);
@@ -73,12 +81,15 @@ function connectWebSocket() {
 
   ws.onclose = () => {
     console.log('WebSocket disconnected');
+    isConnected = false;
     if (reconnectAttempts < BINANCE_CONFIG.WS_MAX_RECONNECT_ATTEMPTS) {
       const delay = getReconnectDelay();
       reconnectTimeout = setTimeout(() => {
         reconnectAttempts++;
         connectWebSocket();
       }, delay);
+    } else {
+      console.error('Max reconnection attempts reached. Please check your connection.');
     }
   };
 

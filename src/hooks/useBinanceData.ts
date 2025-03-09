@@ -23,8 +23,9 @@ export function useBinanceData() {
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   const [activeSymbols, setActiveSymbols] = useState<string[]>([]);
+  const ws = useRef<WebSocket | null>(null);
 
   // Function to determine if a pair is a "gem" (not in top 10-20 market cap)
   const isGemPair = (symbol: string): boolean => {
@@ -82,13 +83,87 @@ export function useBinanceData() {
     }
   }, []);
 
-  // Function to fetch historical price data for calculating volatility and changes
+  // Initialize WebSocket connection
+  const initializeWebSocket = useCallback(() => {
+    if (ws.current) {
+      ws.current.close();
+    }
+
+    ws.current = new WebSocket(`${BINANCE_WS_BASE}/!ticker@arr`);
+
+    ws.current.onopen = () => {
+      console.log('WebSocket connected');
+      setError(null);
+    };
+
+    ws.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (Array.isArray(data)) {
+          const updatedData = data
+            .filter(ticker => 
+              ticker.s.endsWith('USDT') && 
+              !['USDC', 'USDT', 'BUSD', 'DAI', 'UST'].some(pair => ticker.s.endsWith(pair))
+            )
+            .map(ticker => ({
+              symbol: ticker.s,
+              price: parseFloat(ticker.c),
+              priceChange: parseFloat(ticker.p),
+              priceChangePercent: parseFloat(ticker.P),
+              volume: parseFloat(ticker.v),
+              quoteVolume: parseFloat(ticker.q),
+              lastUpdated: Date.now()
+            }));
+          
+          setMarketData(updatedData);
+          setLastUpdated(Date.now());
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+        setError('Error processing market data');
+      }
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setError('WebSocket connection error');
+    };
+
+    ws.current.onclose = () => {
+      console.log('WebSocket disconnected');
+      setTimeout(initializeWebSocket, 5000);
+    };
+  }, []);
+
+  // Function to fetch historical price data with rate limiting
   const fetchHistoricalData = useCallback(async (symbol: string, timeframe: string, limit: number = 30) => {
     const interval = timeframeToInterval[timeframe];
     
+    // Add delay between requests to avoid rate limits
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    
     try {
+      // Add delay before each request
+      await delay(100);
+      
       const response = await fetch(`${BINANCE_KLINES}?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-      if (!response.ok) throw new Error(`Failed to fetch historical data for ${symbol}`);
+      
+      // Check for rate limit headers
+      const remaining = response.headers.get('x-mbx-used-weight-1m');
+      if (remaining && parseInt(remaining) > 1000) {
+        // If close to rate limit, add longer delay
+        await delay(1000);
+      }
+      
+      if (!response.ok) {
+        if (response.status === 429) {
+          // Rate limit hit, wait and retry
+          await delay(2000);
+          return fetchHistoricalData(symbol, timeframe, limit);
+        }
+        throw new Error(`Failed to fetch historical data for ${symbol}: ${response.statusText}`);
+      }
       
       const data = await response.json();
       
@@ -107,22 +182,30 @@ export function useBinanceData() {
     }
   }, []);
 
-  // Function to fetch market data and process it
-  const fetchMarketData = useCallback(async (forceRefresh: boolean = false) => {
-    // Use cached data if it's recent enough
-    const now = Date.now();
-    if (!forceRefresh && now - lastFetchTime < CACHE_DURATION) {
-      return;
-    }
+  useEffect(() => {
+    // Initialize WebSocket connection when component mounts
+    initializeWebSocket();
     
+    // Fetch initial active symbols
+    fetchActiveSymbols();
+
+    return () => {
+      // Cleanup WebSocket connection when component unmounts
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
+  }, [initializeWebSocket, fetchActiveSymbols]);
+
+  // Function to refresh market data manually if needed
+  const refreshData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // First, ensure we have the list of active symbols
-      let symbols = activeSymbols;
-      if (symbols.length === 0) {
-        symbols = await fetchActiveSymbols();
+      await fetchActiveSymbols();
+      if (activeSymbols.length === 0) {
+        throw new Error('No active trading pairs found');
       }
       
       // Fetch 24h ticker data for all symbols
@@ -255,33 +338,62 @@ export function useBinanceData() {
     fetchMarketData(true);
   }, [fetchMarketData]);
 
-  // Initialize data on component mount
+  // Initialize data on component mount with improved error handling and recovery
   useEffect(() => {
-    // Try to load cached data first for immediate display
-    try {
-      const cachedData = localStorage.getItem('cryptoPrediction_marketData');
-      if (cachedData) {
-        const { data, timestamp } = JSON.parse(cachedData);
-        const now = Date.now();
-        if (now - timestamp < CACHE_DURATION) {
-          setMarketData(data);
-          setLastFetchTime(timestamp);
-          setIsLoading(false);
+    let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 5000; // 5 seconds
+
+    const loadData = async () => {
+      // Try to load cached data first for immediate display
+      try {
+        const cachedData = localStorage.getItem('cryptoPrediction_marketData');
+        if (cachedData && isMounted) {
+          const { data, timestamp } = JSON.parse(cachedData);
+          const now = Date.now();
+          if (now - timestamp < CACHE_DURATION * 2) { // More lenient cache duration for initial load
+            setMarketData(data);
+            setLastFetchTime(timestamp);
+            setIsLoading(false);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load cached market data:', err);
+      }
+
+      // Fetch fresh data with retry logic
+      const fetchWithRetry = async () => {
+        try {
+          await fetchMarketData(true);
+          retryCount = 0; // Reset retry count on success
+        } catch (error) {
+          console.error('Error fetching market data:', error);
+          if (retryCount < MAX_RETRIES && isMounted) {
+            retryCount++;
+            setTimeout(fetchWithRetry, RETRY_DELAY);
+          }
+        }
+      };
+
+      await fetchWithRetry();
+    };
+
+    loadData();
+
+    // Set up interval for periodic refresh with error handling
+    const intervalId = setInterval(async () => {
+      if (isMounted) {
+        try {
+          await fetchMarketData();
+        } catch (error) {
+          console.error('Error in periodic refresh:', error);
         }
       }
-    } catch (err) {
-      console.warn('Failed to load cached market data:', err);
-    }
-    
-    // Fetch fresh data
-    fetchMarketData();
-    
-    // Set up interval for periodic refresh
-    const intervalId = setInterval(() => {
-      fetchMarketData();
     }, CACHE_DURATION + 5000); // Refresh every cache duration + 5s
-    
+
     return () => {
+      isMounted = false;
       clearInterval(intervalId);
     };
   }, [fetchMarketData]);

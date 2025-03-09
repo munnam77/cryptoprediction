@@ -42,6 +42,9 @@ const PumpCycleTag: React.FC<PumpCycleTagProps> = ({
     ? `${cycles} pumps >10% in ${timeframe} (avg. ${pumpPercentage.toFixed(1)}%)`
     : `${cycles} pumps >10% in ${timeframe}`;
   
+  // Validate cycles count to prevent invalid array length
+  const validCycles = Math.max(0, Math.min(isNaN(cycles) ? 0 : cycles, 7));
+
   return (
     <div 
       className={`relative flex items-center justify-center 
@@ -56,7 +59,7 @@ const PumpCycleTag: React.FC<PumpCycleTagProps> = ({
     >
       {/* Vertical bars representing each pump cycle */}
       <div className="absolute inset-0 flex items-end justify-evenly px-1">
-        {[...Array(Math.min(cycles, 7))].map((_, index) => {
+        {Array.from({ length: validCycles }, (_, index) => {
           // Calculate height for each bar (random but deterministic based on index)
           const barHeight = 30 + ((index * 7) % 40);
           const barOpacity = 0.4 + (index * 0.1);
