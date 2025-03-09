@@ -1,50 +1,90 @@
-export const BINANCE_CONFIG = {
-  // API Configuration
-  API_KEY: import.meta.env.VITE_BINANCE_API_KEY || '',
-  API_SECRET: import.meta.env.VITE_BINANCE_API_SECRET || '',
+/**
+ * Binance API Configuration
+ * Contains settings and endpoints for Binance API
+ */
+
+// API Base URLs
+export const API_BASE_URL = 'https://api.binance.com';
+export const API_TESTNET_URL = 'https://testnet.binance.vision';
+
+// WebSocket Base URLs
+export const WS_BASE_URL = 'wss://stream.binance.com:9443';
+export const WS_TESTNET_URL = 'wss://testnet.binance.vision';
+
+// API Settings
+export const API_CONFIG = {
+  // Use false in production, true for testing
+  useTestnet: false,
   
-  // WebSocket Configuration
-  WS_RECONNECT_DELAY: Number(import.meta.env.VITE_WS_RECONNECT_DELAY || 5000),
-  WS_MAX_RECONNECT_ATTEMPTS: Number(import.meta.env.VITE_WS_MAX_RECONNECT_ATTEMPTS || 5),
-  
-  // Rate Limiting
-  MAX_REQUESTS_PER_MINUTE: Number(import.meta.env.VITE_API_RATE_LIMIT || 1200),
-  MAX_ORDERS_PER_SECOND: 10,
-  
-  // USDT Pairs Configuration
-  MINIMUM_VOLUME_24H: Number(import.meta.env.VITE_MINIMUM_VOLUME_24H || 100000),
-  MINIMUM_MARKET_CAP: Number(import.meta.env.VITE_MINIMUM_MARKET_CAP || 10000000),
-  
-  // Blacklisted pairs (e.g., known problematic tokens)
-  BLACKLISTED_PAIRS: [
-    'USDC', 
-    'USDT', 
-    'BUSD', 
-    'DAI', 
-    'UST'
-  ],
-  
-  // Update Intervals
-  PRICE_UPDATE_INTERVAL: 60000,
-  VOLUME_UPDATE_INTERVAL: 60000,
-  ORDERBOOK_UPDATE_INTERVAL: 1000,
-  
-  // Cache Configuration
-  CACHE_DURATION: {
-    PRICE: Number(import.meta.env.VITE_CACHE_DURATION_PRICE || 5000),
-    KLINES: Number(import.meta.env.VITE_CACHE_DURATION_KLINES || 60000),
-    MARKET_DATA: Number(import.meta.env.VITE_CACHE_DURATION_MARKET_DATA || 60000),
-    CANDLES: 300000,
-    ORDER_BOOK: 10000,
+  // Base URL based on environment
+  get baseUrl() {
+    return this.useTestnet ? API_TESTNET_URL : API_BASE_URL;
   },
   
-  // Error Handling
-  RETRY_ATTEMPTS: Number(import.meta.env.VITE_ERROR_RETRY_ATTEMPTS || 3),
-  RETRY_DELAY: Number(import.meta.env.VITE_ERROR_RETRY_DELAY || 1000),
-  EXPONENTIAL_BACKOFF: true,
+  // WebSocket URL based on environment
+  get wsUrl() {
+    return this.useTestnet ? WS_TESTNET_URL : WS_BASE_URL;
+  },
   
-  // Validation
-  MINIMUM_PRICE: 0.00000001,
-  MAXIMUM_PRICE_DIGITS: 8,
-  MAXIMUM_QUANTITY_DIGITS: 8,
+  // Request timeout in milliseconds
+  timeout: 30000,
+  
+  // Default request headers
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  
+  // API rate limits
+  rateLimits: {
+    // Requests per minute
+    requestsPerMinute: 1200,
+    // Orders per second
+    ordersPerSecond: 10
+  }
+};
+
+// WebSocket Settings
+export const WS_CONFIG = {
+  // WebSocket reconnection settings
+  reconnect: {
+    enabled: true,
+    maxAttempts: 5,
+    delay: 3000  // ms between reconnection attempts
+  },
+  
+  // WebSocket stream types
+  streams: {
+    ticker: '/ws/ticker',
+    depth: '/ws/depth',
+    trades: '/ws/trades',
+    kline: '/ws/kline'
+  }
+};
+
+// REST API Endpoints
+export const ENDPOINTS = {
+  // Public Endpoints
+  exchange: {
+    info: '/api/v3/exchangeInfo',
+    serverTime: '/api/v3/time',
+    ping: '/api/v3/ping'
+  },
+  
+  // Market Data Endpoints
+  market: {
+    depth: '/api/v3/depth',
+    trades: '/api/v3/trades',
+    historicalTrades: '/api/v3/historicalTrades',
+    aggTrades: '/api/v3/aggTrades',
+    klines: '/api/v3/klines',
+    ticker24hr: '/api/v3/ticker/24hr',
+    tickerPrice: '/api/v3/ticker/price',
+    bookTicker: '/api/v3/ticker/bookTicker'
+  }
+};
+
+export default {
+  API_CONFIG,
+  WS_CONFIG,
+  ENDPOINTS
 };

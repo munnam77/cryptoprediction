@@ -1,240 +1,215 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import VolumeChangeTrendline from './VolumeChangeTrendline';
-import LiquidityDepthGauge from './LiquidityDepthGauge';
-import FlashSentimentSpike from './FlashSentimentSpike';
-import HistoricalVolatilityBadge from './HistoricalVolatilityBadge';
-import AudioPing from './AudioPing';
-import { MarketData } from '../services/BinanceService';
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, TrendingUp, BarChart3 } from 'lucide-react';
+import { TradingPair } from './TradingPairTable';
+import PriceVelocityTicker from './PriceVelocityTicker';
 
 interface TopGainersCarouselProps {
-  gainers: MarketData[];
+  pairs: TradingPair[];
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  onSelectPair: (symbol: string) => void;
+  className?: string;
 }
 
 /**
- * TopGainersCarousel - Displays a horizontal scrollable list of top performing coins
- * Shows real-time data for the top gainers with various indicators
+ * TopGainersCarousel Component
+ * Displays a horizontal carousel of top gaining trading pairs
  */
-const TopGainersCarousel: React.FC<TopGainersCarouselProps> = ({ gainers }) => {
+const TopGainersCarousel: React.FC<TopGainersCarouselProps> = ({
+  pairs,
+  timeframe,
+  onSelectPair,
+  className = ''
+}) => {
   const carouselRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [maxScroll, setMaxScroll] = useState(0);
   
-  // Autoscroll every 5 seconds
+  // Update max scroll value when component mounts or window resizes
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (gainers.length > 0) {
-        setActiveIndex((prevIndex) => (prevIndex + 1) % gainers.length);
+    const updateMaxScroll = () => {
+      if (carouselRef.current) {
+        const { scrollWidth, clientWidth } = carouselRef.current;
+        setMaxScroll(Math.max(0, scrollWidth - clientWidth));
       }
-    }, 5000);
+    };
     
-    return () => clearInterval(interval);
-  }, [gainers.length]);
+    updateMaxScroll();
+    window.addEventListener('resize', updateMaxScroll);
+    
+    return () => {
+      window.removeEventListener('resize', updateMaxScroll);
+    };
+  }, [pairs]);
   
-  // Scroll to active card
+  // Handle scroll events
   useEffect(() => {
-    if (carouselRef.current && gainers.length > 0) {
-      const scrollAmount = activeIndex * (carouselRef.current.scrollWidth / gainers.length);
-      carouselRef.current.scrollTo({
-        left: scrollAmount,
-        behavior: 'smooth'
-      });
+    const handleScroll = () => {
+      if (carouselRef.current) {
+        setScrollPosition(carouselRef.current.scrollLeft);
+      }
+    };
+    
+    const carousel = carouselRef.current;
+    if (carousel) {
+      carousel.addEventListener('scroll', handleScroll);
+      return () => carousel.removeEventListener('scroll', handleScroll);
     }
-  }, [activeIndex, gainers.length]);
+  }, []);
   
-  // Handle manual navigation
-  const handlePrev = () => {
-    setActiveIndex((prevIndex) => 
-      prevIndex === 0 ? gainers.length - 1 : prevIndex - 1
-    );
+  // Scroll left
+  const scrollLeft = () => {
+    if (carouselRef.current) {
+      const newPosition = Math.max(0, scrollPosition - 300);
+      carouselRef.current.scrollTo({ left: newPosition, behavior: 'smooth' });
+    }
   };
   
-  const handleNext = () => {
-    setActiveIndex((prevIndex) => 
-      (prevIndex + 1) % gainers.length
-    );
+  // Scroll right
+  const scrollRight = () => {
+    if (carouselRef.current) {
+      const newPosition = Math.min(maxScroll, scrollPosition + 300);
+      carouselRef.current.scrollTo({ left: newPosition, behavior: 'smooth' });
+    }
   };
   
-  if (gainers.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full bg-gray-800 bg-opacity-30 rounded-lg p-6">
-        <div className="text-center text-gray-400">
-          <p>Loading top gainers data...</p>
-        </div>
-      </div>
-    );
-  }
+  // Format price with appropriate precision
+  const formatPrice = (price: number): string => {
+    if (price < 0.001) return price.toFixed(8);
+    if (price < 0.01) return price.toFixed(6);
+    if (price < 1) return price.toFixed(4);
+    if (price < 1000) return price.toFixed(2);
+    return price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  };
+  
+  // Format percentage
+  const formatPercent = (value: number): string => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+  };
+  
+  // Format volume with appropriate suffix (K, M, B)
+  const formatVolume = (volume: number): string => {
+    if (volume >= 1_000_000_000) return `$${(volume / 1_000_000_000).toFixed(2)}B`;
+    if (volume >= 1_000_000) return `$${(volume / 1_000_000).toFixed(2)}M`;
+    if (volume >= 1_000) return `$${(volume / 1_000).toFixed(2)}K`;
+    return `$${volume.toFixed(2)}`;
+  };
+  
+  // Get top gainers
+  const topGainers = pairs
+    .filter(pair => pair.priceChange24h > 0)
+    .sort((a, b) => b.priceChange24h - a.priceChange24h)
+    .slice(0, 10);
+  
+  // Get background gradient based on price change
+  const getGradient = (priceChange: number): string => {
+    if (priceChange > 20) return 'from-green-500/20 to-green-900/5';
+    if (priceChange > 10) return 'from-green-600/15 to-green-900/5';
+    if (priceChange > 5) return 'from-green-700/10 to-green-900/5';
+    return 'from-green-800/5 to-green-900/5';
+  };
   
   return (
-    <div className="relative">
-      {/* Navigation buttons */}
-      <button 
-        onClick={handlePrev}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-gray-800 bg-opacity-70 rounded-full p-1 text-gray-300 hover:text-white focus:outline-none"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-      
-      <button 
-        onClick={handleNext}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-gray-800 bg-opacity-70 rounded-full p-1 text-gray-300 hover:text-white focus:outline-none"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
-      
-      {/* Carousel Container */}
-      <div 
-        ref={carouselRef}
-        className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        {gainers.map((gainer) => {
-          // Calculate additional metrics for features
-          const volumeChangePercent = gainer.volumeChangePercent || 0;
-          const priceChangePercent = gainer.priceChangePercent;
-          const volatility = gainer.volatility || 50;
-          const liquidity = gainer.liquidity || 50;
-          
-          // Generate volume history array for trendline (mock data based on current value)
-          const volumeHistory = [
-            volumeChangePercent * 0.7,
-            volumeChangePercent * 0.8,
-            volumeChangePercent * 0.9,
-            volumeChangePercent
-          ];
-          
-          // Determine liquidity trend
-          const liquidityTrend = volumeChangePercent > 5 
-            ? 'increasing' 
-            : volumeChangePercent < -5 
-              ? 'decreasing' 
-              : 'stable';
-          
-          // Determine if there's a sentiment spike (simulated)
-          const hasSentimentSpike = priceChangePercent > 8 || (priceChangePercent > 3 && volumeChangePercent > 15);
-          
-          // Map volatility to percentile (0-100)
-          const volatilityPercentile = Math.min(100, Math.max(0, volatility));
-          
-          // Audio ping for significant price movements
-          const needsAudioPing = priceChangePercent > 10;
-          
-          return (
-            <div 
-              key={gainer.symbol}
-              className="min-w-full snap-center px-6 py-3"
-            >
-              <div className="bg-gray-800 bg-opacity-40 backdrop-blur rounded-lg border border-gray-700 p-4 hover:border-indigo-500 transition-colors">
-                {/* Header with Coin Name & Price */}
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center">
-                    <span className="font-bold text-lg">{gainer.baseAsset}</span>
-                    <span className="text-xs text-gray-400 ml-1">{gainer.quoteAsset}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-300">
-                      ${gainer.price.toFixed(gainer.price < 1 ? 6 : 2)}
-                    </div>
-                    <div className={`text-xs font-bold ${priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Middle Section with Main Stats */}
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {/* Volume Change % */}
-                  <div className="bg-gray-800 rounded-md p-2">
-                    <div className="text-xs text-gray-400 mb-1">Volume Change</div>
-                    <div className="flex items-center justify-between">
-                      <div className={`text-sm font-medium ${volumeChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {volumeChangePercent >= 0 ? '+' : ''}{volumeChangePercent.toFixed(1)}%
-                      </div>
-                      <VolumeChangeTrendline
-                        volumeHistory={volumeHistory}
-                        className="ml-2"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Liquidity Depth */}
-                  <div className="bg-gray-800 rounded-md p-2">
-                    <div className="text-xs text-gray-400 mb-1">Liquidity</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium">
-                        {liquidity.toFixed(0)}/100
-                      </div>
-                      <LiquidityDepthGauge
-                        depth={liquidity}
-                        trend={liquidityTrend}
-                        className="ml-2"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Bottom Section with Feature Indicators */}
-                <div className="flex items-center justify-between text-xs">
-                  {/* Left side features */}
-                  <div className="flex items-center space-x-2">
-                    {/* Historical Volatility Badge */}
-                    <HistoricalVolatilityBadge
-                      percentile={volatilityPercentile}
-                      timeframe="1h"
-                      className="text-xs"
-                    />
-                    
-                    {/* Flash Sentiment Spike - only shown when triggered */}
-                    {hasSentimentSpike && (
-                      <FlashSentimentSpike
-                        postCount={Math.round(priceChangePercent * 10)}
-                        active={true}
-                        className="ml-2"
-                      />
-                    )}
-                  </div>
-                  
-                  {/* Right side features */}
-                  <div className="flex items-center space-x-2">
-                    {/* Pump Cycle Tag */}
-                    {priceChangePercent > 5 && (
-                      <div className="px-2 py-0.5 bg-purple-500 bg-opacity-30 border border-purple-500 rounded-full text-purple-300 text-xs">
-                        Pump Cycle
-                      </div>
-                    )}
-                    
-                    {/* Volume Decay Warning */}
-                    {priceChangePercent > 0 && volumeChangePercent < -10 && (
-                      <div className="w-3 h-3 transform rotate-180 border-t-4 border-l-4 border-r-4 border-transparent border-t-gray-400 opacity-70" />
-                    )}
-                  </div>
-                </div>
-                
-                {/* Audio Ping - Hidden component that plays sound when needed */}
-                {needsAudioPing && (
-                  <AudioPing
-                    active={true}
-                    type={priceChangePercent >= 0 ? 'gain' : 'loss'}
-                    className="hidden"
-                  />
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className={`relative ${className}`}>
+      <div className="flex items-center mb-3">
+        <TrendingUp size={18} className="text-green-500 mr-2" />
+        <h2 className="text-lg font-semibold">Top Gainers</h2>
+        <span className="text-xs text-gray-400 ml-2">Based on {timeframe} timeframe</span>
       </div>
       
-      {/* Pagination Indicators */}
-      <div className="flex justify-center mt-3">
-        {gainers.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setActiveIndex(index)}
-            className={`w-2 h-2 rounded-full mx-1 ${
-              index === activeIndex ? 'bg-indigo-500' : 'bg-gray-600'
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
-        ))}
+      {/* Navigation buttons */}
+      <div className="absolute right-0 top-0 flex space-x-2">
+        <button
+          onClick={scrollLeft}
+          disabled={scrollPosition <= 0}
+          className={`p-1 rounded-full ${
+            scrollPosition <= 0 
+              ? 'text-gray-600 bg-gray-800 cursor-not-allowed' 
+              : 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+          }`}
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <button
+          onClick={scrollRight}
+          disabled={scrollPosition >= maxScroll}
+          className={`p-1 rounded-full ${
+            scrollPosition >= maxScroll 
+              ? 'text-gray-600 bg-gray-800 cursor-not-allowed' 
+              : 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+          }`}
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      
+      {/* Carousel */}
+      <div 
+        ref={carouselRef}
+        className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-smooth"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {topGainers.length > 0 ? (
+          topGainers.map((pair) => (
+            <div 
+              key={pair.symbol}
+              className={`min-w-[220px] max-w-[220px] snap-start mr-4 bg-gradient-to-br ${getGradient(pair.priceChange24h)} bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-green-500 cursor-pointer transition-all duration-200`}
+              onClick={() => onSelectPair(pair.symbol)}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <div className="font-medium text-white">{pair.baseAsset}/{pair.quoteAsset}</div>
+                  <div className="text-xs text-gray-400">{pair.symbol}</div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <div className="font-mono font-medium">{formatPrice(pair.price)}</div>
+                  <div className="text-xs text-green-500 flex items-center">
+                    <TrendingUp size={12} className="mr-1" />
+                    {formatPercent(pair.priceChange24h)}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-4">
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">24h Volume</div>
+                  <div className="text-sm font-medium">{formatVolume(pair.volume24h)}</div>
+                </div>
+                
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Velocity</div>
+                  <PriceVelocityTicker 
+                    velocity={pair.priceVelocity} 
+                    trend={pair.velocityTrend} 
+                  />
+                </div>
+              </div>
+              
+              {/* Price change bar */}
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-1">
+                  <div className="text-xs text-gray-400">Price Change</div>
+                  <div className="text-xs text-green-400">{formatPercent(pair.priceChange24h)}</div>
+                </div>
+                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-green-500 to-green-300" 
+                    style={{ width: `${Math.min(100, pair.priceChange24h * 2)}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              {/* Rank badge */}
+              <div className="absolute top-2 right-2 bg-green-900/50 text-green-400 text-xs px-1.5 py-0.5 rounded-sm flex items-center">
+                <BarChart3 size={12} className="mr-1" />
+                <span>#{topGainers.indexOf(pair) + 1}</span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="w-full py-10 text-center text-gray-500">
+            No gainers available for the current timeframe
+          </div>
+        )}
       </div>
     </div>
   );

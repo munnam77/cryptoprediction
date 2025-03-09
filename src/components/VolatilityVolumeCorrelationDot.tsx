@@ -20,15 +20,25 @@ const VolatilityVolumeCorrelationDot: React.FC<VolatilityVolumeCorrelationDotPro
   className = '',
 }) => {
   // Normalize values to coordinate system
-  const normalizedVolatility = Math.min(Math.max(volatility, 0), 100) / 100;
+  const normalizedVolatility = Math.min(Math.max(volatility || 0, 0), 100) / 100;
   
   // Volume change percentage is unbounded, so we normalize it between -1 and 1
   // where anything beyond +/-100% is capped
-  const normalizedVolumeChange = Math.min(Math.max(volumeChange / 100, -1), 1);
+  const normalizedVolumeChange = Math.min(Math.max((volumeChange || 0) / 100, -1), 1);
   
+  // Safely format number with fallback
+  const formatNumber = (num: number | undefined): string => {
+    if (typeof num !== 'number' || isNaN(num)) return '0';
+    return num.toFixed(2);
+  };
+
   // Calculate position
   const xPos = 5 + normalizedVolatility * (width - 10); // x-axis is volatility
   const yPos = height - 5 - ((normalizedVolumeChange + 1) / 2) * (height - 10); // y-axis is volume change
+  
+  // Ensure xPos and yPos are valid numbers
+  const safeXPos = isNaN(xPos) ? width / 2 : xPos;
+  const safeYPos = isNaN(yPos) ? height / 2 : yPos;
   
   // Calculate correlation value (-1 to 1)
   // High positive correlation: high volatility with high volume (top right)
@@ -52,7 +62,7 @@ const VolatilityVolumeCorrelationDot: React.FC<VolatilityVolumeCorrelationDotPro
   const dotSize = 3 + normalizedVolatility * 5;
   
   // Tooltip content
-  const tooltipContent = `Volatility: ${volatility}%, Volume Change: ${volumeChange.toFixed(2)}%
+  const tooltipContent = `Volatility: ${formatNumber(volatility)}%, Volume Change: ${formatNumber(volumeChange)}%
 ${correlation > 0.6 ? 'High correlation' : correlation < -0.6 ? 'Negative correlation' : 'Moderate correlation'}`;
   
   return (
@@ -98,8 +108,8 @@ ${correlation > 0.6 ? 'High correlation' : correlation < -0.6 ? 'Negative correl
             
             {/* Correlation dot */}
             <circle
-              cx={xPos}
-              cy={yPos}
+              cx={safeXPos}
+              cy={safeYPos}
               r={dotSize}
               fill={getDotColor()}
               className={`drop-shadow-glow-sm ${

@@ -1,107 +1,124 @@
-import React, { useEffect, useRef } from 'react';
-import { ArrowRight } from 'lucide-react';
+import React from 'react';
+import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 
 interface PriceVelocityTickerProps {
-  symbol: string;
-  velocity: number; // Price change per second
-  timeframe: string;
+  velocity: number; // Price change rate per timeframe
+  trend: 'accelerating' | 'decelerating' | 'stable';
   className?: string;
-  width?: number;
 }
 
 /**
  * PriceVelocityTicker Component
- * Scrolling bar showing price velocity (change per second)
+ * Shows a scrolling bar indicating price velocity (speed of price change)
  */
 const PriceVelocityTicker: React.FC<PriceVelocityTickerProps> = ({
-  symbol,
   velocity,
-  timeframe,
-  className = '',
-  width = 120
+  trend,
+  className = ''
 }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Determine if velocity is positive or negative
+  const isPositive = velocity > 0;
+  const isNegative = velocity < 0;
+  const isNeutral = velocity === 0;
   
-  // Format velocity based on magnitude
-  const formatVelocity = (value: number) => {
-    const absValue = Math.abs(value);
-    if (absValue >= 1) {
-      return value.toFixed(2);
-    } else if (absValue >= 0.01) {
-      return value.toFixed(4);
-    } else if (absValue >= 0.0001) {
-      return value.toFixed(6);
-    } else {
-      return value.toFixed(8);
-    }
+  // Get absolute value for display
+  const absVelocity = Math.abs(velocity);
+  
+  // Format velocity for display
+  const formatVelocity = () => {
+    if (absVelocity < 0.001) return '0.000';
+    if (absVelocity < 1) return absVelocity.toFixed(4);
+    if (absVelocity < 10) return absVelocity.toFixed(3);
+    if (absVelocity < 100) return absVelocity.toFixed(2);
+    return absVelocity.toFixed(1);
   };
   
-  // Get color based on velocity
+  // Get color based on velocity and trend
   const getColor = () => {
-    if (velocity > 0) return 'text-green-500 dark:text-green-400';
-    if (velocity < 0) return 'text-red-500 dark:text-red-400';
-    return 'text-gray-500 dark:text-gray-400';
+    if (isNeutral) return 'text-gray-400 bg-gray-700';
+    
+    if (isPositive) {
+      if (trend === 'accelerating') return 'text-green-300 bg-green-900/30';
+      if (trend === 'decelerating') return 'text-green-400 bg-green-900/20';
+      return 'text-green-400 bg-green-900/10';
+    }
+    
+    if (isNegative) {
+      if (trend === 'accelerating') return 'text-red-300 bg-red-900/30';
+      if (trend === 'decelerating') return 'text-red-400 bg-red-900/20';
+      return 'text-red-400 bg-red-900/10';
+    }
+    
+    return 'text-gray-400 bg-gray-700';
+  };
+  
+  // Get icon based on velocity and trend
+  const getIcon = () => {
+    if (isNeutral) return <ArrowRight size={14} />;
+    
+    if (isPositive) {
+      return <TrendingUp size={14} />;
+    }
+    
+    if (isNegative) {
+      return <TrendingDown size={14} />;
+    }
+    
+    return <ArrowRight size={14} />;
+  };
+  
+  // Get animation speed based on velocity
+  const getAnimationSpeed = () => {
+    if (absVelocity < 0.001) return 'animate-none';
+    if (absVelocity < 0.01) return 'animate-scroll-slow';
+    if (absVelocity < 0.1) return 'animate-scroll';
+    return 'animate-scroll-fast';
   };
   
   // Get tooltip text
   const getTooltip = () => {
-    const direction = velocity > 0 ? 'upward' : velocity < 0 ? 'downward' : 'neutral';
-    return `${symbol} price velocity: ${formatVelocity(velocity)}/sec (${direction} trend over ${timeframe})`;
-  };
-  
-  // Scroll animation
-  useEffect(() => {
-    const scrollElement = scrollRef.current;
-    if (!scrollElement) return;
-    
-    const scrollSpeed = Math.min(Math.abs(velocity) * 500, 50); // Faster for higher velocity, capped at 50px/s
-    let startTime: number;
-    let animationFrameId: number;
-    
-    const scroll = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const elapsed = timestamp - startTime;
-      
-      // Calculate scroll position (loop every 2 seconds)
-      const position = (elapsed * scrollSpeed / 1000) % scrollElement.scrollWidth;
-      scrollElement.scrollLeft = position;
-      
-      animationFrameId = requestAnimationFrame(scroll);
-    };
-    
-    animationFrameId = requestAnimationFrame(scroll);
-    
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [velocity]);
-  
-  // Generate ticker content
-  const generateTickerContent = () => {
-    const sign = velocity > 0 ? '+' : '';
-    const content = `${sign}${formatVelocity(velocity)}/sec`;
-    
-    // Repeat content to create scrolling effect
-    return Array.from({ length: 10 }).map((_, index) => (
-      <div key={index} className="flex items-center mx-3">
-        <span>{content}</span>
-        <ArrowRight className="w-3 h-3 mx-1" />
-      </div>
-    ));
+    const directionText = isPositive ? 'upward' : isNegative ? 'downward' : 'stable';
+    const trendText = trend === 'accelerating' ? 'accelerating' : trend === 'decelerating' ? 'decelerating' : 'stable';
+    return `${directionText} price movement at ${formatVelocity()}/sec (${trendText})`;
   };
   
   return (
-    <div 
-      className={`relative overflow-hidden ${className}`}
-      style={{ width: `${width}px` }}
-      title={getTooltip()}
-    >
+    <div className={`relative group ${className}`}>
       <div 
-        ref={scrollRef}
-        className={`flex whitespace-nowrap overflow-x-hidden ${getColor()}`}
-        style={{ width: `${width}px` }}
+        className={`flex items-center px-2 py-1 rounded-md ${getColor()} overflow-hidden`}
+        title={getTooltip()}
       >
-        {generateTickerContent()}
+        {/* Icon */}
+        <div className="mr-1">
+          {getIcon()}
+        </div>
+        
+        {/* Velocity text */}
+        <div className="font-mono text-xs">
+          {isPositive && '+'}
+          {formatVelocity()}
+          <span className="text-xs opacity-70">/sec</span>
+        </div>
+        
+        {/* Scrolling background effect */}
+        {!isNeutral && (
+          <div 
+            className={`absolute inset-0 bg-gradient-to-r ${
+              isPositive 
+                ? 'from-green-500/0 via-green-500/10 to-green-500/0' 
+                : 'from-red-500/0 via-red-500/10 to-red-500/0'
+            } ${getAnimationSpeed()}`}
+            style={{ 
+              width: '200%',
+              transform: 'translateX(-50%)'
+            }}
+          ></div>
+        )}
+      </div>
+      
+      {/* Tooltip */}
+      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+        {getTooltip()}
       </div>
     </div>
   );

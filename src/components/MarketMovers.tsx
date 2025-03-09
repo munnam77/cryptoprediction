@@ -24,6 +24,7 @@ const MarketMovers: React.FC<MarketMoversProps> = ({ className = '' }) => {
     marketData,
     loading,
     error,
+    wsConnected,
     refresh,
     sortData,
     filterData
@@ -33,6 +34,32 @@ const MarketMovers: React.FC<MarketMoversProps> = ({ className = '' }) => {
     limit: 100,
     refreshInterval: 60000 // 1 minute
   });
+
+  // Show connection status
+  useEffect(() => {
+    if (!wsConnected) {
+      console.warn('WebSocket disconnected - real-time updates paused');
+    }
+  }, [wsConnected]);
+
+  // Filter and sort market data
+  const processedMarketData = React.useMemo(() => {
+    if (!marketData.length) return [];
+    
+    return marketData
+      .filter(item => 
+        item.price && // Ensure we have a valid price
+        (!minMarketCap || (item.marketCap && item.marketCap >= minMarketCap)) &&
+        (!maxMarketCap || (item.marketCap && item.marketCap <= maxMarketCap)) &&
+        item.priceChangePercent[selectedTimeframe] !== null // Ensure we have data for selected timeframe
+      )
+      .sort((a, b) => {
+        const aValue = a[sortConfig.key] || 0;
+        const bValue = b[sortConfig.key] || 0;
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      });
+  }, [marketData, sortConfig, selectedTimeframe, minMarketCap, maxMarketCap]);
+
 
   // Handle timeframe change
   const handleTimeframeChange = (timeframe: TimeframeOption) => {

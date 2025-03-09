@@ -218,53 +218,17 @@ const TradingDashboard: React.FC<TradingDashboardProps> = ({
       </div>
       
       {/* Trading tools section */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Trading Signals</h3>
-          <div className="flex flex-col space-y-3">
-            <LiveTradeSignalBeam 
-              signal={marketData.trend === 'bull' ? 'buy' : 'sell'} 
-              strength={marketData.trendStrength} 
-              source="AI Prediction" 
-            />
-            <MicroRSIBar 
-              value={marketData.rsi} 
-            />
-            <PriceVelocityTicker 
-              velocity={marketData.priceChange24h > 0 ? 0.05 : -0.03} 
-              symbol={selectedSymbol} 
-              timeframe={selectedTimeframe}
-            />
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        {/* Price and Target Information */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <ScalpersProfitTarget
+            currentPrice={profitTargets.entryPrice}
+            targetPrice={profitTargets.targetPrice}
+            stopLoss={profitTargets.stopLossPrice}
+            timeframe={selectedTimeframe}
+            className="mb-2"
+          />
         </div>
-        
-        <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Price Analysis</h3>
-          <div className="flex flex-col space-y-3">
-            <PricePivotDot 
-              price={marketData.price} 
-              pivotPoints={marketData.pivotPoints} 
-            />
-            <VolatilityWaveform 
-              volatilityHistory={[40, 45, 55, 65, 60, 70, 65, 75, 65, 60]} 
-            />
-            <TimeframeRewindSlider 
-              currentBar={0} 
-              maxBars={10} 
-              timeframe={selectedTimeframe} 
-            />
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Trading Tools</h3>
-          <div className="flex flex-col space-y-3">
-            <ScalpersProfitTarget 
-              entry={profitTargets.entryPrice} 
-              target={profitTargets.targetPrice} 
-              stopLoss={profitTargets.stopLossPrice} 
-              riskReward={profitTargets.riskRewardRatio}
-            />
             <ScalpersStreakCounter 
               consecutiveWins={marketData.consecutiveWins} 
               consecutiveLosses={marketData.consecutiveLosses} 

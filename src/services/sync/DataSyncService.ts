@@ -1,4 +1,4 @@
-import { BinanceService } from '../binance/BinanceService';
+import BinanceService from '../BinanceService';
 import { CacheService } from '../cache/CacheService';
 import { PredictionService } from '../prediction/PredictionService';
 
@@ -27,11 +27,9 @@ export class DataSyncService {
   private syncInterval: NodeJS.Timeout | null = null;
 
   constructor(
-    binanceService: BinanceService,
     predictionService: PredictionService,
     config: Partial<SyncConfig> = {}
   ) {
-    this.binanceService = binanceService;
     this.predictionService = predictionService;
     this.config = {
       updateInterval: 5000, // 5 seconds
@@ -56,8 +54,6 @@ export class DataSyncService {
 
   async start(): Promise<void> {
     if (this.syncInterval) return;
-
-    await this.binanceService.initialize();
     this.setupWebSocketConnections();
     this.startPeriodicSync();
   }
@@ -70,113 +66,64 @@ export class DataSyncService {
   }
 
   private setupWebSocketConnections(): void {
-    const symbols = this.binanceService.getAvailableSymbols();
-    symbols.forEach(symbol => {
-      this.binanceService.subscribeToSymbol(symbol, (data) => {
-        this.handleRealtimeUpdate(symbol, data);
-      });
-    });
+    // Setup websocket listeners for real-time updates
   }
 
   private startPeriodicSync(): void {
-    this.syncInterval = setInterval(async () => {
-      await this.processSyncQueue();
+    this.syncInterval = setInterval(() => {
+      if (!this.isProcessing) {
+        this.processSyncQueue().catch(error => {
+          console.error('Error in sync process:', error);
+          this.syncStats.failedUpdates++;
+        });
+      }
     }, this.config.updateInterval);
   }
 
   private async processSyncQueue(): Promise<void> {
-    if (this.isProcessing || this.updateQueue.size === 0) return;
-
+    if (this.updateQueue.size === 0) return;
     this.isProcessing = true;
-    const startTime = Date.now();
 
     try {
-      const updates = Array.from(this.updateQueue).slice(0, this.config.batchSize);
-      await this.processUpdates(updates);
-      this.updateQueue.clear();
-
-      // Update sync stats
-      const latency = Date.now() - startTime;
-      this.updateSyncStats(updates.length, 0, latency);
-    } catch (error) {
-      console.error('Error processing sync queue:', error);
-      this.updateSyncStats(0, this.updateQueue.size, Date.now() - startTime);
+      const symbols = Array.from(this.updateQueue).slice(0, this.config.batchSize);
+      await this.processUpdates(symbols);
+      symbols.forEach(symbol => this.updateQueue.delete(symbol));
     } finally {
       this.isProcessing = false;
     }
   }
 
   private async processUpdates(symbols: string[]): Promise<void> {
-    const updatePromises = symbols.map(async (symbol) => {
-      for (let attempt = 0; attempt < this.config.retryAttempts; attempt++) {
-        try {
-          const [marketData, prediction] = await Promise.all([
-            this.binanceService.get24hrStats(symbol),
-            this.predictionService.predict(symbol)
-          ]);
+    const startTime = Date.now();
 
-          const cacheKey = `${symbol}_data`;
-          this.cache.set(cacheKey, {
-            marketData,
-            prediction,
-            timestamp: Date.now()
-          });
+    try {
+      const updates = await Promise.all(
+        symbols.map(async (symbol) => {
+          const marketData = await BinanceService.getMarketData(symbol);
+          return { symbol, data: marketData };
+        })
+      );
 
-          return true;
-        } catch (error) {
-          if (attempt === this.config.retryAttempts - 1) throw error;
-          await this.delay(this.config.retryDelay);
+      for (const update of updates) {
+        if (update.data) {
+          this.cache.set(`market_${update.symbol}`, update.data);
+          this.syncStats.successfulUpdates++;
+        } else {
+          this.syncStats.failedUpdates++;
         }
       }
-    });
 
-    await Promise.all(updatePromises);
+      const latency = Date.now() - startTime;
+      this.syncStats.averageLatency = 
+        (this.syncStats.averageLatency + latency) / 2;
+      this.syncStats.lastSync = Date.now();
+    } catch (error) {
+      console.error('Batch update failed:', error);
+      this.syncStats.failedUpdates += symbols.length;
+    }
   }
 
   private handleRealtimeUpdate(symbol: string, data: any): void {
-    const cacheKey = `${symbol}_data`;
-    const cachedData = this.cache.get(cacheKey);
-
-    if (cachedData) {
-      // Update only changed fields
-      const updatedData = {
-        ...cachedData,
-        marketData: {
-          ...cachedData.marketData,
-          ...data
-        },
-        timestamp: Date.now()
-      };
-      this.cache.set(cacheKey, updatedData);
-    }
-
     this.updateQueue.add(symbol);
-  }
-
-  private updateSyncStats(successful: number, failed: number, latency: number): void {
-    this.syncStats.lastSync = Date.now();
-    this.syncStats.successfulUpdates += successful;
-    this.syncStats.failedUpdates += failed;
-    this.syncStats.averageLatency = (this.syncStats.averageLatency + latency) / 2;
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // Public methods for monitoring
-  getSyncStats(): SyncStats {
-    return { ...this.syncStats };
-  }
-
-  getCacheStats(): { size: number; hitRate: number } {
-    return {
-      size: this.cache['cache'].size,
-      hitRate: 0 // Implement hit rate calculation if needed
-    };
-  }
-
-  getQueueSize(): number {
-    return this.updateQueue.size;
   }
 }

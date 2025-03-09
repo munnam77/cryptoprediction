@@ -1,82 +1,74 @@
-import React, { useState } from 'react';
-import { Flame } from 'lucide-react';
+import React from 'react';
 
 interface TradersHotZoneProps {
-  intensity?: number; // 0-100
-  isActive?: boolean;
-  onToggle?: () => void;
+  zones: Array<{
+    price: number;
+    intensity: number;
+  }>;
+  currentPrice: number;
   className?: string;
 }
 
 /**
  * TradersHotZone Component
- * Toggleable heatmap overlay for top trading pairs
+ * Visualizes areas of high trading activity as a heatmap
  */
 const TradersHotZone: React.FC<TradersHotZoneProps> = ({
-  intensity = 50,
-  isActive = false,
-  onToggle,
+  zones = [],
+  currentPrice,
   className = ''
 }) => {
-  // Local state for intensity if not controlled
-  const [localIntensity, setLocalIntensity] = useState(intensity);
+  if (!zones.length || !currentPrice) return null;
+
+  // Sort zones by price for visualization
+  const sortedZones = [...zones].sort((a, b) => a.price - b.price);
   
-  // Use provided intensity or local state
-  const currentIntensity = intensity !== undefined ? intensity : localIntensity;
-  
-  // Handle intensity change
-  const handleIntensityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newIntensity = parseInt(e.target.value, 10);
-    setLocalIntensity(newIntensity);
+  // Find min/max prices for scaling
+  const minPrice = Math.min(...zones.map(z => z.price));
+  const maxPrice = Math.max(...zones.map(z => z.price));
+  const priceRange = maxPrice - minPrice || 1;
+
+  // Format price for tooltip
+  const formatPrice = (price: number) => {
+    if (price >= 1000) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(3);
+    if (price >= 0.01) return price.toFixed(4);
+    return price.toFixed(6);
   };
-  
-  // Get gradient based on intensity
-  const getGradient = () => {
-    const normalizedIntensity = currentIntensity / 100;
-    return `linear-gradient(to bottom, rgba(255, 153, 0, ${normalizedIntensity * 0.7}), rgba(255, 51, 0, ${normalizedIntensity * 0.5}))`;
-  };
-  
+
   return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={onToggle}
-          className={`flex items-center space-x-1 text-sm font-medium px-2 py-1 rounded-md transition-colors
-            ${isActive 
-              ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' 
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-            }`}
-          title="Toggle hot zone heatmap overlay"
-        >
-          <Flame className={`w-4 h-4 ${isActive ? 'text-orange-500' : 'text-gray-500'}`} />
-          <span>Hot Zone</span>
-        </button>
+    <div 
+      className={`relative h-1.5 bg-gray-700/30 rounded-full overflow-hidden ${className}`}
+      title={`${zones.length} trading zones identified`}
+    >
+      {/* Render each zone as a heat spot */}
+      {sortedZones.map((zone, index) => {
+        const position = ((zone.price - minPrice) / priceRange) * 100;
+        const width = Math.max(4, (zone.intensity / 100) * 12); // 4-12px width based on intensity
         
-        {isActive && (
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Intensity</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={currentIntensity}
-              onChange={handleIntensityChange}
-              className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-            />
-          </div>
-        )}
-      </div>
-      
-      {isActive && (
-        <div 
-          className="w-full h-20 rounded-md overflow-hidden"
-          style={{ background: getGradient() }}
-        >
-          <div className="w-full h-full flex items-center justify-center text-white text-opacity-80 text-sm">
-            Heatmap Preview
-          </div>
-        </div>
-      )}
+        return (
+          <div
+            key={index}
+            className="absolute top-0 bottom-0 rounded-full bg-orange-500"
+            style={{
+              left: `${position}%`,
+              width: `${width}px`,
+              transform: 'translateX(-50%)',
+              opacity: zone.intensity / 100,
+            }}
+            title={`Trading zone at $${formatPrice(zone.price)} (${zone.intensity.toFixed(0)}% intensity)`}
+          />
+        );
+      })}
+
+      {/* Current price indicator */}
+      <div
+        className="absolute top-0 bottom-0 w-0.5 bg-white"
+        style={{
+          left: `${((currentPrice - minPrice) / priceRange) * 100}%`,
+          transform: 'translateX(-50%)',
+        }}
+      />
     </div>
   );
 };

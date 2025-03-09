@@ -2,7 +2,7 @@ import React from 'react';
 
 type LiquidityDepthGaugeProps = {
   depth: number; // 0-100 value representing liquidity depth
-  trend: 'increasing' | 'decreasing' | 'stable';
+  trend?: 'increasing' | 'decreasing' | 'stable';
   width?: number;
   height?: number;
   className?: string;
@@ -14,13 +14,13 @@ type LiquidityDepthGaugeProps = {
  */
 const LiquidityDepthGauge: React.FC<LiquidityDepthGaugeProps> = ({
   depth,
-  trend,
+  trend = 'stable',
   width = 80,
   height = 40,
   className = '',
 }) => {
   // Normalize depth to 0-100 range
-  const normalizedDepth = Math.min(Math.max(depth, 0), 100);
+  const normalizedDepth = Math.min(Math.max(depth || 0, 0), 100);
   
   // Calculate fill percentage (0-180 degrees for semi-circle)
   const fillPercentage = (normalizedDepth / 100) * 180;
@@ -47,8 +47,13 @@ const LiquidityDepthGauge: React.FC<LiquidityDepthGaugeProps> = ({
     decreasing: ['#0c4a6e', '#0ea5e9']  // very dark blue to blue
   };
   
+  // Ensure trend is a valid value
+  const safeTrend = trend && ['increasing', 'decreasing', 'stable'].includes(trend) 
+    ? trend 
+    : 'stable';
+  
   // Tooltip content
-  const tooltipContent = `Order depth: ${depth}% (${trend})`;
+  const tooltipContent = `Order depth: ${normalizedDepth}% (${safeTrend})`;
   
   // Animation for the gauge fill
   const animationDuration = '1.2s';
@@ -71,8 +76,8 @@ const LiquidityDepthGauge: React.FC<LiquidityDepthGaugeProps> = ({
         {/* Gradient definition */}
         <defs>
           <linearGradient id="depthGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={gradientColors[trend][0]} />
-            <stop offset="100%" stopColor={gradientColors[trend][1]} />
+            <stop offset="0%" stopColor={gradientColors[safeTrend][0]} />
+            <stop offset="100%" stopColor={gradientColors[safeTrend][1]} />
           </linearGradient>
         </defs>
         
@@ -82,11 +87,9 @@ const LiquidityDepthGauge: React.FC<LiquidityDepthGaugeProps> = ({
           fill="none"
           stroke="url(#depthGradient)"
           strokeWidth="3"
-          strokeLinecap="round"
           style={{
-            strokeDasharray: radius * Math.PI,
-            strokeDashoffset: radius * Math.PI * (1 - normalizedDepth / 100),
-            transition: `stroke-dashoffset ${animationDuration} ease-out`
+            transition: `stroke-dasharray ${animationDuration} ease-in-out`,
+            strokeDasharray: `${fillPercentage * radius * Math.PI / 180} ${radius * Math.PI}`,
           }}
           className="drop-shadow-md"
         />
@@ -97,7 +100,7 @@ const LiquidityDepthGauge: React.FC<LiquidityDepthGaugeProps> = ({
           cy={endY}
           r="3"
           fill={normalizedDepth > 70 ? '#10b981' : normalizedDepth > 40 ? '#0ea5e9' : '#0c4a6e'}
-          className={`${trend === 'increasing' ? 'animate-pulse' : ''}`}
+          className={`${safeTrend === 'increasing' ? 'animate-pulse' : ''}`}
           style={{ filter: 'drop-shadow(0 0 2px currentColor)' }}
         />
         
@@ -116,13 +119,13 @@ const LiquidityDepthGauge: React.FC<LiquidityDepthGaugeProps> = ({
       </svg>
       
       {/* Trend indicator */}
-      {trend !== 'stable' && (
+      {safeTrend !== 'stable' && (
         <div 
           className={`absolute bottom-1 right-1 text-xs font-bold ${
-            trend === 'increasing' ? 'text-emerald-400' : 'text-blue-300'
+            safeTrend === 'increasing' ? 'text-emerald-400' : 'text-blue-300'
           }`}
         >
-          {trend === 'increasing' ? '↑' : '↓'}
+          {safeTrend === 'increasing' ? '↑' : '↓'}
         </div>
       )}
     </div>

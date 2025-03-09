@@ -1,9 +1,8 @@
 import React from 'react';
 
 interface VolatilityRangeBarProps {
-  volatility: number;
-  high: number;
-  low: number;
+  volatility: number; // 0-100 volatility score
+  price: number;
   className?: string;
   width?: number;
   height?: number;
@@ -11,21 +10,27 @@ interface VolatilityRangeBarProps {
 
 /**
  * VolatilityRangeBar Component
- * Displays a horizontal gradient bar showing price range (wider = higher range)
+ * Displays a horizontal gradient bar showing volatility intensity
  */
 const VolatilityRangeBar: React.FC<VolatilityRangeBarProps> = ({
-  volatility,
-  high,
-  low,
+  volatility = 0,
+  price = 0,
   className = '',
   width = 80,
   height = 8
 }) => {
-  // Calculate range percentage
-  const rangePercent = ((high - low) / low) * 100;
+  if (!price || volatility < 0) {
+    return null;
+  }
+
+  // Calculate visual range based on volatility score
+  const rangePercent = volatility;
+  const estimatedLow = price * (1 - (rangePercent / 200)); // Max 50% down
+  const estimatedHigh = price * (1 + (rangePercent / 200)); // Max 50% up
   
   // Format price based on magnitude
-  const formatPrice = (value: number) => {
+  const formatPrice = (value: number | null | undefined) => {
+    if (!value) return '$0.00';
     if (value >= 1000) {
       return `$${value.toFixed(2)}`;
     } else if (value >= 1) {
@@ -37,51 +42,40 @@ const VolatilityRangeBar: React.FC<VolatilityRangeBarProps> = ({
     }
   };
   
-  // Calculate current price position within the range (0-100%)
-  const pricePosition = Math.min(
-    Math.max(
-      ((volatility - low) / (high - low)) * 100,
-      0
-    ),
-    100
-  );
-  
+  // Get color based on volatility level
+  const getGradientColors = () => {
+    if (volatility >= 80) return 'from-red-500 to-orange-500';
+    if (volatility >= 50) return 'from-orange-500 to-yellow-500';
+    if (volatility >= 30) return 'from-blue-500 to-purple-500';
+    return 'from-green-500 to-blue-500';
+  };
+
   return (
     <div 
       className={`relative ${className}`}
-      title={`Range: ${formatPrice(low)}-${formatPrice(high)} (${rangePercent.toFixed(2)}%)`}
+      title={`Volatility: ${volatility.toFixed(1)}% Range: ${formatPrice(estimatedLow)}-${formatPrice(estimatedHigh)}`}
     >
       {/* Range bar */}
       <div 
-        className="rounded-full overflow-hidden"
+        className="rounded-full overflow-hidden bg-gray-700/30"
         style={{ width: `${width}px`, height: `${height}px` }}
       >
         <div 
-          className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-500"
+          className={`h-full bg-gradient-to-r ${getGradientColors()} transition-all duration-500`}
           style={{ 
-            backgroundSize: `${100 + rangePercent * 2}% 100%` 
+            width: `${Math.min(100, volatility)}%`
           }}
         />
       </div>
       
-      {/* Current price indicator */}
-      <div 
-        className="absolute top-0 w-2 h-2 bg-white border border-blue-500 rounded-full transform -translate-x-1/2 -translate-y-1/2"
-        style={{ 
-          left: `${pricePosition}%`,
-          top: `${height/2}px`
-        }}
-      />
-      
-      {/* Min price label */}
-      <div className="absolute text-xs text-gray-500 dark:text-gray-400 -left-1 top-full mt-1">
-        {formatPrice(low)}
-      </div>
-      
-      {/* Max price label */}
-      <div className="absolute text-xs text-gray-500 dark:text-gray-400 -right-1 top-full mt-1">
-        {formatPrice(high)}
-      </div>
+      {/* Volatility threshold markers */}
+      {[30, 50, 80].map(threshold => (
+        <div
+          key={threshold}
+          className="absolute top-0 bottom-0 w-px bg-gray-400/30"
+          style={{ left: `${threshold}%` }}
+        />
+      ))}
     </div>
   );
 };

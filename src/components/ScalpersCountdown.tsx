@@ -1,122 +1,121 @@
 import React, { useState, useEffect } from 'react';
+import { Clock } from 'lucide-react';
 
 interface ScalpersCountdownProps {
-  remainingTime: number;
-  duration: number;
-  timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+  seconds: number;
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
   className?: string;
-  size?: number;
 }
 
 /**
  * ScalpersCountdown Component
- * Circular timer showing countdown to next data refresh
+ * Shows a circular timer counting down to the next data refresh
  */
 const ScalpersCountdown: React.FC<ScalpersCountdownProps> = ({
-  remainingTime,
-  duration,
+  seconds,
   timeframe,
-  className = '',
-  size = 40
+  className = ''
 }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(remainingTime);
-  const [percentage, setPercentage] = useState<number>((remainingTime / duration) * 100);
+  const [countdown, setCountdown] = useState(seconds);
   
+  // Update countdown every second
   useEffect(() => {
-    // Update time left
-    const updateTimeLeft = () => {
-      const newTimeLeft = Math.max(0, timeLeft - 1);
-      setTimeLeft(newTimeLeft);
-      
-      // Calculate percentage for circle animation
-      const newPercentage = (newTimeLeft / duration) * 100;
-      setPercentage(newPercentage);
-    };
+    setCountdown(seconds);
     
-    // Set interval for countdown
-    const intervalId = setInterval(updateTimeLeft, 1000);
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 0) {
+          return seconds; // Reset to initial value when it reaches zero
+        }
+        return prev - 1;
+      });
+    }, 1000);
     
-    return () => clearInterval(intervalId);
-  }, [timeLeft, duration]);
+    return () => clearInterval(timer);
+  }, [seconds]);
   
-  // Format time left
-  const formatTimeLeft = () => {
-    const hours = Math.floor(timeLeft / 3600);
-    const minutes = Math.floor((timeLeft % 3600) / 60);
-    const seconds = timeLeft % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
+  // Format time for display
+  const formatTime = () => {
+    if (countdown < 60) {
+      return `${countdown}s`;
+    } else if (countdown < 3600) {
+      const minutes = Math.floor(countdown / 60);
+      const secs = countdown % 60;
+      return `${minutes}m${secs > 0 ? ` ${secs}s` : ''}`;
     } else {
-      return `${seconds}s`;
+      const hours = Math.floor(countdown / 3600);
+      const minutes = Math.floor((countdown % 3600) / 60);
+      return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`;
     }
   };
   
-  // Calculate circle properties
-  const radius = (size - 4) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
-  
-  // Determine color based on time left
-  const getColor = () => {
-    // For 1m timeframe, less than 10 seconds is red
-    if (timeframe === '1m' && timeLeft < 10) return 'text-red-500 stroke-red-500';
-    // For 5m timeframe, less than 30 seconds is red
-    if (timeframe === '5m' && timeLeft < 30) return 'text-red-500 stroke-red-500';
-    // For 15m timeframe, less than 1 minute is red
-    if (timeframe === '15m' && timeLeft < 60) return 'text-red-500 stroke-red-500';
-    // For 1h timeframe, less than 5 minutes is red
-    if (timeframe === '1h' && timeLeft < 300) return 'text-red-500 stroke-red-500';
-    // For 4h timeframe, less than 15 minutes is red
-    if (timeframe === '4h' && timeLeft < 900) return 'text-red-500 stroke-red-500';
-    // For 1d timeframe, less than 30 minutes is red
-    if (timeframe === '1d' && timeLeft < 1800) return 'text-red-500 stroke-red-500';
+  // Calculate progress percentage (0-100)
+  const getProgress = () => {
+    let totalSeconds;
+    switch (timeframe) {
+      case '15m': totalSeconds = 15 * 60; break;
+      case '30m': totalSeconds = 30 * 60; break;
+      case '1h': totalSeconds = 60 * 60; break;
+      case '4h': totalSeconds = 4 * 60 * 60; break;
+      case '1d': totalSeconds = 24 * 60 * 60; break;
+      default: totalSeconds = 60 * 60;
+    }
     
-    // Default colors
-    if (percentage < 25) return 'text-orange-500 stroke-orange-500';
-    if (percentage < 50) return 'text-yellow-500 stroke-yellow-500';
-    return 'text-blue-500 stroke-blue-500';
+    return 100 - (countdown / totalSeconds * 100);
   };
   
+  // Get color based on remaining time
+  const getColor = () => {
+    if (countdown < 60) return 'text-red-500'; // Less than 1 minute
+    if (countdown < 300) return 'text-yellow-500'; // Less than 5 minutes
+    return 'text-green-500';
+  };
+  
+  // Calculate stroke dash values for circle progress
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference - (getProgress() / 100) * circumference;
+  
   return (
-    <div 
-      className={`relative inline-flex items-center justify-center ${className}`}
-      title={`Next ${timeframe} update in ${formatTimeLeft()}`}
-    >
-      <svg width={size} height={size} className="transform -rotate-90">
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="transparent"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="text-gray-200 dark:text-gray-700"
-        />
+    <div className={`relative group ${className}`}>
+      <div className="flex items-center">
+        {/* SVG Circle Progress */}
+        <svg width="40" height="40" className="transform -rotate-90">
+          {/* Background circle */}
+          <circle
+            cx="20"
+            cy="20"
+            r={radius}
+            fill="transparent"
+            stroke="#374151"
+            strokeWidth="3"
+          />
+          
+          {/* Progress circle */}
+          <circle
+            cx="20"
+            cy="20"
+            r={radius}
+            fill="transparent"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
+            className={getColor()}
+          />
+        </svg>
         
-        {/* Progress circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="transparent"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className={getColor()}
-          strokeLinecap="round"
-        />
-      </svg>
+        {/* Time display */}
+        <div className="ml-2">
+          <div className="text-xs text-gray-400">Next Update</div>
+          <div className={`text-sm font-medium ${getColor()}`}>{formatTime()}</div>
+        </div>
+      </div>
       
-      {/* Time text */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`text-xs font-medium ${getColor()}`}>
-          {formatTimeLeft()}
-        </span>
+      {/* Tooltip */}
+      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+        {`${formatTime()} until ${timeframe} update`}
       </div>
     </div>
   );

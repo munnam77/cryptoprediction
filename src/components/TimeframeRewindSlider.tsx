@@ -1,123 +1,125 @@
 import React, { useState } from 'react';
-import { Rewind, Play } from 'lucide-react';
+import { Clock, Rewind } from 'lucide-react';
 
 interface TimeframeRewindSliderProps {
-  maxRewindBars: number;
-  currentRewind: number;
-  onRewindChange: (bars: number) => void;
-  timeframe: string;
+  timestamp: number;
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  onUpdate: (timestamp: number) => void;
   className?: string;
 }
 
 /**
  * TimeframeRewindSlider Component
- * Slider to rewind chart data to previous bars
+ * Allows rewinding metrics to view historical data
  */
 const TimeframeRewindSlider: React.FC<TimeframeRewindSliderProps> = ({
-  maxRewindBars,
-  currentRewind,
-  onRewindChange,
+  timestamp,
   timeframe,
+  onUpdate,
   className = ''
 }) => {
-  const [isRewinding, setIsRewinding] = useState(currentRewind > 0);
+  const [value, setValue] = useState(100); // 100 = current time, 0 = max rewind
+  const [isRewinding, setIsRewinding] = useState(false);
+  
+  // Calculate max rewind time in milliseconds based on timeframe
+  const getMaxRewindTime = (): number => {
+    switch (timeframe) {
+      case '15m': return 15 * 60 * 1000 * 4; // 1 hour (4 periods)
+      case '30m': return 30 * 60 * 1000 * 8; // 4 hours (8 periods)
+      case '1h': return 60 * 60 * 1000 * 24; // 24 hours (24 periods)
+      case '4h': return 4 * 60 * 60 * 1000 * 7; // 28 hours (7 periods)
+      case '1d': return 24 * 60 * 60 * 1000 * 7; // 7 days (7 periods)
+      default: return 60 * 60 * 1000 * 24; // Default to 24 hours
+    }
+  };
   
   // Handle slider change
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    onRewindChange(value);
-    setIsRewinding(value > 0);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = parseInt(e.target.value);
+    setValue(newValue);
+    
+    // Calculate new timestamp
+    const maxRewindTime = getMaxRewindTime();
+    const rewindAmount = maxRewindTime * (1 - newValue / 100);
+    const newTimestamp = Date.now() - rewindAmount;
+    
+    // Update parent component
+    onUpdate(newTimestamp);
+    
+    // Set rewinding state
+    setIsRewinding(newValue < 100);
   };
   
-  // Handle play button click
-  const handlePlayClick = () => {
-    onRewindChange(0);
-    setIsRewinding(false);
-  };
-  
-  // Get tooltip text
-  const getTooltip = () => {
-    if (currentRewind === 0) {
-      return `Current ${timeframe} data (live)`;
-    } else {
-      return `Rewound ${currentRewind} ${timeframe} bars into the past`;
+  // Format time for display
+  const formatTime = () => {
+    if (value === 100) return 'Current';
+    
+    const maxRewindTime = getMaxRewindTime();
+    const rewindAmount = maxRewindTime * (1 - value / 100);
+    
+    if (rewindAmount < 60 * 1000) return 'Just now';
+    if (rewindAmount < 60 * 60 * 1000) {
+      const minutes = Math.floor(rewindAmount / (60 * 1000));
+      return `${minutes}m ago`;
     }
-  };
-  
-  // Get time description based on timeframe and rewind amount
-  const getTimeDescription = () => {
-    if (currentRewind === 0) return 'Live';
-    
-    let unit = '';
-    let amount = currentRewind;
-    
-    switch (timeframe) {
-      case '1m':
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '5m':
-        amount = amount * 5;
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '15m':
-        amount = amount * 15;
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '30m':
-        amount = amount * 30;
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '1h':
-        unit = amount === 1 ? 'hour' : 'hours';
-        break;
-      case '4h':
-        amount = amount * 4;
-        unit = amount === 1 ? 'hour' : 'hours';
-        break;
-      case '1d':
-        unit = amount === 1 ? 'day' : 'days';
-        break;
-      default:
-        unit = 'bars';
+    if (rewindAmount < 24 * 60 * 60 * 1000) {
+      const hours = Math.floor(rewindAmount / (60 * 60 * 1000));
+      return `${hours}h ago`;
     }
     
-    return `-${amount} ${unit}`;
+    const days = Math.floor(rewindAmount / (24 * 60 * 60 * 1000));
+    return `${days}d ago`;
+  };
+  
+  // Get color based on rewind state
+  const getColor = () => {
+    if (!isRewinding) return 'bg-indigo-600';
+    return 'bg-purple-600';
   };
   
   return (
-    <div 
-      className={`flex items-center space-x-2 ${className}`}
-      title={getTooltip()}
-    >
-      {/* Rewind icon */}
-      <Rewind 
-        className={`w-4 h-4 ${isRewinding ? 'text-blue-500' : 'text-gray-400'}`} 
-      />
+    <div className={`relative group ${className}`}>
+      <div className="flex items-center">
+        {/* Rewind icon */}
+        <Rewind 
+          size={16} 
+          className={`mr-2 ${isRewinding ? 'text-purple-400' : 'text-gray-400'}`} 
+        />
+        
+        {/* Slider */}
+        <div className="flex-1 mx-2">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={value}
+            onChange={handleChange}
+            className={`w-full h-1.5 rounded-full appearance-none cursor-pointer ${
+              isRewinding ? 'bg-purple-900/30' : 'bg-gray-700'
+            }`}
+            style={{
+              // Custom thumb styles
+              WebkitAppearance: 'none',
+              appearance: 'none',
+              outline: 'none',
+              // Track styles
+              background: `linear-gradient(to right, ${isRewinding ? '#9333ea' : '#4f46e5'} 0%, ${isRewinding ? '#9333ea' : '#4f46e5'} ${value}%, #374151 ${value}%, #374151 100%)`,
+            }}
+          />
+        </div>
+        
+        {/* Time display */}
+        <div className="ml-2 text-xs font-medium min-w-16 text-right">
+          <span className={isRewinding ? 'text-purple-400' : 'text-gray-400'}>
+            {formatTime()}
+          </span>
+        </div>
+      </div>
       
-      {/* Slider */}
-      <input
-        type="range"
-        min="0"
-        max={maxRewindBars}
-        value={currentRewind}
-        onChange={handleSliderChange}
-        className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-      />
-      
-      {/* Play button (return to live) */}
-      {isRewinding && (
-        <button
-          onClick={handlePlayClick}
-          className="p-1 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
-        >
-          <Play className="w-3 h-3" />
-        </button>
-      )}
-      
-      {/* Time description */}
-      <span className={`text-xs font-mono ${isRewinding ? 'text-blue-500' : 'text-gray-500'}`}>
-        {getTimeDescription()}
-      </span>
+      {/* Tooltip */}
+      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+        {isRewinding ? 'Historical view' : 'Current data'} ({formatTime()})
+      </div>
     </div>
   );
 };

@@ -2,99 +2,104 @@ import React from 'react';
 
 interface PumpProbabilityDialProps {
   probability: number; // 0-100
-  timeframe: string;
+  timeframe?: '15m' | '30m' | '1h' | '4h' | '1d';
   className?: string;
-  size?: number;
 }
 
 /**
  * PumpProbabilityDial Component
- * Semicircular gauge showing likelihood of price pump
+ * Shows a tiny dial indicating the probability of a price pump
  */
 const PumpProbabilityDial: React.FC<PumpProbabilityDialProps> = ({
   probability,
-  timeframe,
-  className = '',
-  size = 80
+  timeframe = '1h',
+  className = ''
 }) => {
-  // Ensure probability is between 0-100
-  const validProbability = Math.min(Math.max(probability, 0), 100);
+  // Normalize probability to 0-100 range
+  const normalizedProbability = Math.min(100, Math.max(0, probability));
   
-  // Calculate dimensions
-  const radius = size / 2;
-  const strokeWidth = 6;
-  const normalizedRadius = radius - strokeWidth / 2;
-  const circumference = normalizedRadius * Math.PI;
-  
-  // Calculate stroke dash based on probability (semicircle)
-  const strokeDasharray = `${circumference} ${circumference}`;
-  const strokeDashoffset = circumference - (validProbability / 100) * circumference;
+  // Calculate rotation angle for the needle (0-180 degrees)
+  const rotationAngle = (normalizedProbability / 100) * 180;
   
   // Get color based on probability
   const getColor = () => {
-    if (validProbability >= 70) return 'text-green-500';
-    if (validProbability >= 40) return 'text-yellow-500';
+    if (normalizedProbability >= 75) return 'text-green-500';
+    if (normalizedProbability >= 50) return 'text-yellow-500';
+    if (normalizedProbability >= 25) return 'text-orange-500';
     return 'text-red-500';
   };
   
-  // Get label text
-  const getLabel = () => {
-    if (validProbability >= 70) return 'High';
-    if (validProbability >= 40) return 'Medium';
-    return 'Low';
+  // Get glow effect based on probability
+  const getGlowEffect = () => {
+    if (normalizedProbability >= 75) return 'shadow-glow-green';
+    if (normalizedProbability >= 50) return 'shadow-glow-yellow';
+    return '';
   };
   
   // Get tooltip text
   const getTooltip = () => {
-    return `Pump probability: ${validProbability}% (${getLabel()}) for ${timeframe} timeframe`;
+    let probabilityText;
+    if (normalizedProbability >= 75) probabilityText = 'Very High';
+    else if (normalizedProbability >= 50) probabilityText = 'High';
+    else if (normalizedProbability >= 25) probabilityText = 'Medium';
+    else probabilityText = 'Low';
+    
+    return `${probabilityText} pump probability (${normalizedProbability.toFixed(0)}%) in ${timeframe}`;
   };
   
   return (
-    <div 
-      className={`relative flex flex-col items-center ${className}`}
-      title={getTooltip()}
-    >
-      <svg
-        height={radius}
-        width={size}
-        className="transform rotate-180"
+    <div className={`relative group ${className}`}>
+      <div 
+        className="relative w-10 h-10"
+        title={getTooltip()}
       >
-        {/* Background semicircle */}
-        <path
-          d={`
-            M ${strokeWidth/2}, ${radius}
-            a ${normalizedRadius}, ${normalizedRadius} 0 1,1 ${size - strokeWidth}, 0
-          `}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-gray-200 dark:text-gray-700"
-        />
+        {/* Dial background */}
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          {/* Dial background */}
+          <path 
+            d="M5 20 A15 15 0 0 1 35 20" 
+            fill="none" 
+            stroke="#374151" 
+            strokeWidth="3" 
+            strokeLinecap="round"
+          />
+          
+          {/* Colored progress arc */}
+          <path 
+            d={`M5 20 A15 15 0 0 1 ${5 + 30 * (normalizedProbability / 100)} 20`} 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="3" 
+            strokeLinecap="round"
+            className={getColor()}
+          />
+          
+          {/* Dial center point */}
+          <circle cx="20" cy="20" r="2" fill="#6B7280" />
+          
+          {/* Dial needle */}
+          <line 
+            x1="20" 
+            y1="20" 
+            x2="20" 
+            y2="8" 
+            stroke="currentColor" 
+            strokeWidth="1.5" 
+            strokeLinecap="round"
+            className={`${getColor()} ${getGlowEffect()}`}
+            transform={`rotate(${rotationAngle} 20 20)`}
+          />
+        </svg>
         
-        {/* Foreground semicircle (progress) */}
-        <path
-          d={`
-            M ${strokeWidth/2}, ${radius}
-            a ${normalizedRadius}, ${normalizedRadius} 0 1,1 ${size - strokeWidth}, 0
-          `}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          strokeDasharray={strokeDasharray}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          className={getColor()}
-        />
-      </svg>
+        {/* Probability percentage */}
+        <div className={`absolute bottom-0 left-0 right-0 text-center text-xs font-medium ${getColor()}`}>
+          {normalizedProbability.toFixed(0)}%
+        </div>
+      </div>
       
-      {/* Probability text */}
-      <div className="flex flex-col items-center mt-1">
-        <span className={`text-lg font-bold ${getColor()}`}>
-          {validProbability}%
-        </span>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          {getLabel()}
-        </span>
+      {/* Tooltip */}
+      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+        {getTooltip()}
       </div>
     </div>
   );
