@@ -145,6 +145,9 @@ export interface MarketData {
   priceVelocity?: number;
   priceVelocityTrend?: 'accelerating' | 'decelerating' | 'stable';
   pumpProbability?: number;
+  sellPressure?: number;
+  buyPressure?: number;
+  baseAssetVolume?: number;
 }
 
 export interface WebSocketMessage {

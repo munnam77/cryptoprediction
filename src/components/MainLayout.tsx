@@ -47,13 +47,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   topGainers,
   lowCapGems,
   allMarketData,
-  isLoading
+  isLoading,
+  marketSentiment,
+  marketVolatility,
+  btcChangePercent,
+  marketChangePercent
 }) => {
   const [selectedPair, setSelectedPair] = useState<MarketData | null>(null);
   const [alertsEnabled, setAlertsEnabled] = useState<boolean>(true);
   const [audioPingEnabled, setAudioPingEnabled] = useState<boolean>(false);
   const [historicalTimestamp, setHistoricalTimestamp] = useState<number>(Date.now());
   const [isHistoricalView, setIsHistoricalView] = useState<boolean>(false);
+  const [showHotZone, setShowHotZone] = useState<boolean>(true);
 
   // Helper to parse trading pair symbol
   const parseSymbol = (symbol: string) => {
@@ -80,8 +85,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       if (updatedPair) {
         setSelectedPair(updatedPair);
       }
+    } else if (allMarketData.length > 0 && !selectedPair) {
+      // Auto-select the first pair if none is selected
+      setSelectedPair(allMarketData[0]);
     }
-  }, [allMarketData]);
+  }, [allMarketData, selectedPair]);
 
   // Trading pair selection handler
   const handlePairSelect = (pair: MarketData) => {
@@ -126,63 +134,64 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const renderTradingPairRow = (pair: MarketData) => {
     const { baseAsset, quoteAsset } = parseSymbol(pair.symbol);
     const isHighVolatility = (pair.volatility || 0) > 80;
+    const isSelected = selectedPair?.symbol === pair.symbol;
     
     return (
       <tr 
         key={pair.symbol}
-        className={`border-b border-gray-700/50 hover:bg-gray-700/50 cursor-pointer ${
-          selectedPair?.symbol === pair.symbol ? 'bg-gray-700/50' : ''
+        className={`border-b border-gray-700/30 hover:bg-gray-700/40 cursor-pointer transition-colors duration-200 ${
+          isSelected ? 'bg-gray-700/50 border-l-2 border-l-indigo-500' : ''
         } ${isHighVolatility ? 'bg-orange-900/20' : ''}`}
         onClick={() => handlePairSelect(pair)}
       >
-        <td className="px-2 py-2 relative">
+        <td className="px-3 py-3 relative">
           <div className="flex items-center">
-            <span className="font-medium">{baseAsset}</span>
+            <span className="font-medium text-white">{baseAsset}</span>
             <span className="ml-1 text-xs text-gray-400">{quoteAsset}</span>
             {pair.breakout && (
               <BreakoutAlert 
                 breakout={pair.breakout}
                 currentPrice={pair.price}
-                className="ml-1"
+                className="ml-2"
               />
             )}
           </div>
         </td>
-        <td className="px-2 py-2 text-right">
+        <td className="px-3 py-3 text-right">
           <div className="flex items-center justify-end">
-            ${pair.price.toFixed(pair.price < 1 ? 6 : 2)}
+            <span className="font-medium">${pair.price.toFixed(pair.price < 1 ? 6 : 2)}</span>
             {pair.pivotPoint && (
               <PricePivotDot 
                 pivotPoint={pair.pivotPoint}
                 currentPrice={pair.price}
-                className="ml-1 w-2 h-2" 
+                className="ml-2 w-2 h-2" 
               />
             )}
           </div>
         </td>
-        <td className="px-2 py-2 text-right">
-          <span className={getColorClass(pair.priceChangePercent)}>
+        <td className="px-3 py-3 text-right">
+          <span className={`${getColorClass(pair.priceChangePercent)} font-medium`}>
             {formatChangePercent(pair.priceChangePercent)}
           </span>
           {pair.trend && (
             <TrendStrengthIcon
               trend={pair.trend.direction === 'up' ? 'bull' : 'bear'}
               strength={Math.ceil(pair.trend.strength / 33) as 1 | 2 | 3}
-              className="ml-1 inline-block"
+              className="ml-2 inline-block"
             />
           )}
         </td>
-        <td className="px-2 py-2 text-right">
-          <span className={getColorClass(pair.volumeChangePercent)}>
+        <td className="px-3 py-3 text-right">
+          <span className={`${getColorClass(pair.volumeChangePercent)} font-medium`}>
             {formatChangePercent(pair.volumeChangePercent)}
           </span>
           <VolatilityRangeBar
             volatility={pair.volatility || 0}
             price={pair.price}
-            className="mt-1 w-full h-1"
+            className="mt-2 w-full h-1"
           />
         </td>
-        <td className="px-2 py-2">
+        <td className="px-3 py-3">
           <div className="flex items-center justify-end space-x-2">
             <OrderBookImbalanceTag 
               imbalance={pair.orderBookImbalance || 50}
@@ -193,11 +202,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               onClick={() => console.log(`Set alert for ${pair.symbol}`)}
             />
           </div>
-          {pair.tradingZones && (
+          {pair.tradingZones && showHotZone && (
             <TradersHotZone 
               zones={pair.tradingZones}
               currentPrice={pair.price}
-              className="w-full h-1 mt-1"
+              className="w-full h-1 mt-2"
             />
           )}
         </td>
@@ -209,12 +218,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const renderTradingPairTable = () => (
     <table className="w-full table-fixed">
       <thead>
-        <tr className="text-xs text-gray-400 border-b border-gray-700">
-          <th className="px-2 py-2 text-left w-[24%]">Pair</th>
-          <th className="px-2 py-2 text-right w-[17%]">Price</th>
-          <th className="px-2 py-2 text-right w-[20%]">{selectedTimeframe} Chg%</th>
-          <th className="px-2 py-2 text-right w-[20%]">Vol Chg%</th>
-          <th className="px-2 py-2 text-right w-[19%]">Features</th>
+        <tr className="text-xs text-gray-400 border-b border-gray-700/50">
+          <th className="px-3 py-3 text-left w-[24%]">Pair</th>
+          <th className="px-3 py-3 text-right w-[17%]">Price</th>
+          <th className="px-3 py-3 text-right w-[20%]">{selectedTimeframe} Chg%</th>
+          <th className="px-3 py-3 text-right w-[20%]">Vol Chg%</th>
+          <th className="px-3 py-3 text-right w-[19%]">
+            <div className="flex items-center justify-end">
+              <span>Features</span>
+              <button 
+                onClick={() => setShowHotZone(!showHotZone)}
+                className="ml-2 text-xs bg-gray-700 hover:bg-gray-600 px-1.5 py-0.5 rounded"
+                title={showHotZone ? "Hide hot zones" : "Show hot zones"}
+              >
+                {showHotZone ? "Hide" : "Show"}
+              </button>
+            </div>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -230,7 +250,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       
       {/* Historical data indicator - show when viewing past data */}
       {isHistoricalView && (
-        <div className="fixed top-16 right-4 z-50 bg-purple-900 bg-opacity-80 text-white px-3 py-2 rounded-md text-sm">
+        <div className="fixed top-16 right-4 z-50 bg-purple-900 bg-opacity-80 text-white px-3 py-2 rounded-md text-sm backdrop-blur-sm border border-purple-700/50 shadow-lg">
           <div className="font-medium">Historical View</div>
           <div className="text-xs">{new Date(historicalTimestamp).toLocaleString()}</div>
           <button 
@@ -238,31 +258,62 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               setHistoricalTimestamp(Date.now());
               setIsHistoricalView(false);
             }}
-            className="mt-1 text-xs bg-purple-700 hover:bg-purple-600 px-2 py-1 rounded w-full"
+            className="mt-2 text-xs bg-purple-700 hover:bg-purple-600 px-2 py-1 rounded w-full transition-colors duration-200"
           >
             Return to Live
           </button>
         </div>
       )}
       
+      {/* Market Overview Bar */}
+      <div className="mb-4 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-400">Market Sentiment</span>
+            <span className={`font-medium ${marketSentiment > 60 ? 'text-green-400' : marketSentiment < 40 ? 'text-red-400' : 'text-yellow-400'}`}>
+              {marketSentiment.toFixed(1)}%
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-400">Volatility</span>
+            <span className={`font-medium ${marketVolatility > 70 ? 'text-orange-400' : marketVolatility > 40 ? 'text-yellow-400' : 'text-blue-400'}`}>
+              {marketVolatility.toFixed(1)}%
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-400">BTC Change</span>
+            <span className={`font-medium ${getColorClass(btcChangePercent)}`}>
+              {formatChangePercent(btcChangePercent)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-400">Market Change</span>
+            <span className={`font-medium ${getColorClass(marketChangePercent)}`}>
+              {formatChangePercent(marketChangePercent)}
+            </span>
+          </div>
+        </div>
+        <TimeframeSelector 
+          selectedTimeframe={selectedTimeframe} 
+          onTimeframeChange={onTimeframeChange}
+          timeframes={['15m', '30m', '1h', '4h', '1d']} 
+        />
+      </div>
+      
       {/* Main Content Area - Following exact layout from context.md */}
       <div className="flex flex-1 overflow-hidden space-x-4">
         {/* Left Panel - Trading Pair Table (30% width) */}
         <div className="w-[30%] overflow-hidden flex flex-col">
-          <div className="flex-1 bg-gray-800 bg-opacity-60 rounded-lg backdrop-blur-sm border border-gray-700 p-3">
-            <h2 className="text-lg font-medium mb-2 flex justify-between items-center">
+          <div className="flex-1 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
+            <h2 className="text-lg font-medium mb-3 flex justify-between items-center">
               <span>Trading Pairs</span>
-              <TimeframeSelector 
-                selectedTimeframe={selectedTimeframe} 
-                onTimeframeChange={onTimeframeChange}
-                timeframes={['15m', '30m', '1h', '4h', '1d']} 
-              />
+              <span className="text-sm text-gray-400">{allMarketData.length} pairs</span>
             </h2>
             
             {isLoading ? (
               <LoadingSkeleton type="table" rows={10} />
             ) : (
-              <div className="overflow-auto max-h-[calc(100vh-180px)]">
+              <div className="overflow-auto max-h-[calc(100vh-220px)] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                 {renderTradingPairTable()}
               </div>
             )}
@@ -271,7 +322,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         
         {/* Center Panel - Prediction Engine (40% width) */}
         <div className="w-[40%] overflow-hidden flex flex-col">
-          <div className="flex-1 bg-gray-800 bg-opacity-60 rounded-lg backdrop-blur-sm border border-gray-700 p-3">
+          <div className="flex-1 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-medium">Prediction Engine</h2>
               <div className="flex items-center space-x-3">
@@ -283,7 +334,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               </div>
             </div>
             
-            <div className="flex space-x-4 mb-3">
+            <div className="flex space-x-4 mb-4">
               {/* Feature 9: Price Velocity Ticker */}
               <PriceVelocityTicker
                 velocity={selectedPair?.priceVelocity || 0}
@@ -331,7 +382,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             
             <div className="grid grid-cols-3 gap-3 mt-4">
               {/* Feature 12: Micro RSI Bar */}
-              <div className="p-2 bg-gray-700 bg-opacity-40 rounded">
+              <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600/30">
                 <h4 className="text-xs text-gray-400 mb-1">RSI</h4>
                 <MicroRSIBar 
                   value={selectedPair?.rsi || 50}
@@ -340,7 +391,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               </div>
               
               {/* Feature 14: Correlation Heat Dot */}
-              <div className="p-2 bg-gray-700 bg-opacity-40 rounded">
+              <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600/30">
                 <h4 className="text-xs text-gray-400 mb-1">BTC Correlation</h4>
                 <CorrelationHeatDot 
                   value={selectedPair?.btcCorrelation || 0}
@@ -349,11 +400,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 />
               </div>
               
-              <div className="p-2 bg-gray-700 bg-opacity-40 rounded flex items-center justify-center">
+              <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600/30 flex items-center justify-center">
                 <div className="text-center">
                   <h4 className="text-xs text-gray-400 mb-1">Alerts</h4>
                   <button 
-                    className={`text-xs px-3 py-1 rounded ${alertsEnabled ? 'bg-green-600' : 'bg-gray-600'}`}
+                    className={`text-xs px-3 py-1 rounded transition-colors duration-200 ${alertsEnabled ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 hover:bg-gray-500'}`}
                     onClick={() => setAlertsEnabled(!alertsEnabled)}
                   >
                     {alertsEnabled ? 'Enabled' : 'Disabled'}
@@ -367,8 +418,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         {/* Right Panel (30% width) */}
         <div className="w-[30%] overflow-hidden flex flex-col space-y-4">
           {/* Top Half: Top Picks Cards (Low-Cap Gems) */}
-          <div className="h-1/2 bg-gray-800 bg-opacity-60 rounded-lg backdrop-blur-sm border border-gray-700 p-3">
-            <h2 className="text-lg font-medium mb-2">Top Picks</h2>
+          <div className="h-1/2 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
+            <h2 className="text-lg font-medium mb-3 flex justify-between items-center">
+              <span>Top Picks</span>
+              <span className="text-sm text-gray-400">Low-Cap Gems</span>
+            </h2>
             {isLoading ? (
               <LoadingSkeleton type="cards" count={5} />
             ) : (
@@ -382,8 +436,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
           
           {/* Bottom Half: Top Gainers Cards */}
-          <div className="h-1/2 bg-gray-800 bg-opacity-60 rounded-lg backdrop-blur-sm border border-gray-700 p-3">
-            <h2 className="text-lg font-medium mb-2">Top Gainers</h2>
+          <div className="h-1/2 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
+            <h2 className="text-lg font-medium mb-3 flex justify-between items-center">
+              <span>Top Gainers</span>
+              <div className="flex items-center">
+                <span className="text-sm text-gray-400 mr-2">Audio Alerts</span>
+                <button 
+                  className={`text-xs px-2 py-1 rounded transition-colors duration-200 ${audioPingEnabled ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+                  onClick={() => setAudioPingEnabled(!audioPingEnabled)}
+                >
+                  {audioPingEnabled ? 'On' : 'Off'}
+                </button>
+              </div>
+            </h2>
             {isLoading ? (
               <LoadingSkeleton type="cards" count={5} />
             ) : (

@@ -1,134 +1,124 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import React from 'react';
+import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 
 interface PriceVelocityTickerProps {
-  velocity: number; // Price change per second, can be positive or negative
-  trend?: 'accelerating' | 'decelerating' | 'stable';
+  velocity: number; // Price change rate per timeframe
+  trend: 'accelerating' | 'decelerating' | 'stable';
   className?: string;
 }
 
 /**
  * PriceVelocityTicker Component
- * Shows the rate of price change per second with scrolling animation
+ * Shows a scrolling bar indicating price velocity (speed of price change)
  */
 const PriceVelocityTicker: React.FC<PriceVelocityTickerProps> = ({
   velocity,
-  trend = 'stable',
+  trend,
   className = ''
 }) => {
-  const [offset, setOffset] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Determine if velocity is positive or negative
+  const isPositive = velocity > 0;
+  const isNegative = velocity < 0;
+  const isNeutral = velocity === 0;
   
-  // Format velocity value
-  const formattedVelocity = Math.abs(velocity).toFixed(5);
-  const sign = velocity >= 0 ? '+' : '-';
+  // Get absolute value for display
+  const absVelocity = Math.abs(velocity);
+  
+  // Format velocity for display
+  const formatVelocity = () => {
+    if (absVelocity < 0.001) return '0.000';
+    if (absVelocity < 1) return absVelocity.toFixed(4);
+    if (absVelocity < 10) return absVelocity.toFixed(3);
+    if (absVelocity < 100) return absVelocity.toFixed(2);
+    return absVelocity.toFixed(1);
+  };
   
   // Get color based on velocity and trend
   const getColor = () => {
-    if (velocity > 0) {
-      return trend === 'accelerating' ? '#22c55e' : '#4ade80'; // Brighter green for accelerating
+    if (isNeutral) return 'text-gray-400 bg-gray-700';
+    
+    if (isPositive) {
+      if (trend === 'accelerating') return 'text-green-300 bg-green-900/30';
+      if (trend === 'decelerating') return 'text-green-400 bg-green-900/20';
+      return 'text-green-400 bg-green-900/10';
     }
-    if (velocity < 0) {
-      return trend === 'accelerating' ? '#ef4444' : '#f87171'; // Brighter red for accelerating
+    
+    if (isNegative) {
+      if (trend === 'accelerating') return 'text-red-300 bg-red-900/30';
+      if (trend === 'decelerating') return 'text-red-400 bg-red-900/20';
+      return 'text-red-400 bg-red-900/10';
     }
-    return '#6b7280'; // Gray for stable/zero
+    
+    return 'text-gray-400 bg-gray-700';
   };
   
-  // Get trend icon
-  const getTrendIcon = () => {
-    if (velocity > 0) {
-      return <TrendingUp className="w-3 h-3" />;
+  // Get icon based on velocity and trend
+  const getIcon = () => {
+    if (isNeutral) return <ArrowRight size={14} />;
+    
+    if (isPositive) {
+      return <TrendingUp size={14} />;
     }
-    if (velocity < 0) {
-      return <TrendingDown className="w-3 h-3" />;
+    
+    if (isNegative) {
+      return <TrendingDown size={14} />;
     }
-    return <Minus className="w-3 h-3" />;
+    
+    return <ArrowRight size={14} />;
   };
   
-  // Get tooltip text based on trend and velocity
+  // Get animation speed based on velocity
+  const getAnimationSpeed = () => {
+    if (absVelocity < 0.001) return 'animate-none';
+    if (absVelocity < 0.01) return 'animate-scroll-slow';
+    if (absVelocity < 0.1) return 'animate-scroll';
+    return 'animate-scroll-fast';
+  };
+  
+  // Get tooltip text
   const getTooltip = () => {
-    let trendText = '';
-    
-    switch (trend) {
-      case 'accelerating':
-        trendText = velocity > 0 ? 'accelerating upwards' : 'accelerating downwards';
-        break;
-      case 'decelerating':
-        trendText = velocity > 0 ? 'slowing upwards movement' : 'slowing downwards movement';
-        break;
-      case 'stable':
-      default:
-        trendText = velocity > 0 ? 'steady upwards' : velocity < 0 ? 'steady downwards' : 'stable';
-    }
-    
-    return `Price changing at ${sign}$${formattedVelocity}/sec (${trendText})`;
-  };
-  
-  // Animate ticker for scrolling effect
-  useEffect(() => {
-    if (!containerRef.current) return;
-    
-    const animationFrame = requestAnimationFrame(function animate() {
-      setOffset(prev => {
-        // Get container width
-        const width = containerRef.current?.offsetWidth || 100;
-        
-        // Reset when offset exceeds width
-        if (Math.abs(prev) >= width) {
-          return 0;
-        }
-        
-        // Move based on velocity direction
-        const speed = Math.min(Math.abs(velocity) * 10, 2); // Clamp speed
-        return prev - (velocity >= 0 ? speed : -speed);
-      });
-      
-      requestAnimationFrame(animate);
-    });
-    
-    return () => cancelAnimationFrame(animationFrame);
-  }, [velocity]);
-  
-  // Get background gradient based on velocity and trend
-  const getBackgroundGradient = () => {
-    const baseColor = getColor();
-    const baseColorTransparent = `${baseColor}00`;
-    
-    if (velocity > 0) {
-      return `linear-gradient(to right, ${baseColorTransparent}, ${baseColor}, ${baseColorTransparent})`;
-    }
-    
-    if (velocity < 0) {
-      return `linear-gradient(to left, ${baseColorTransparent}, ${baseColor}, ${baseColorTransparent})`;
-    }
-    
-    return '';
+    const directionText = isPositive ? 'upward' : isNegative ? 'downward' : 'stable';
+    const trendText = trend === 'accelerating' ? 'accelerating' : trend === 'decelerating' ? 'decelerating' : 'stable';
+    return `${directionText} price movement at ${formatVelocity()}/sec (${trendText})`;
   };
   
   return (
-    <div 
-      className={`relative h-6 bg-gray-800 rounded-md overflow-hidden ${className}`}
-      title={getTooltip()}
-    >
-      {/* Background gradient effect */}
+    <div className={`relative group ${className}`}>
       <div 
-        className="absolute inset-0 opacity-20"
-        style={{ background: getBackgroundGradient() }}
-      />
-      
-      {/* Ticker content */}
-      <div 
-        ref={containerRef}
-        className="absolute inset-0 flex items-center justify-center text-xs font-medium"
-        style={{ color: getColor() }}
+        className={`flex items-center px-2 py-1 rounded-md ${getColor()} overflow-hidden`}
+        title={getTooltip()}
       >
-        <div 
-          className="flex items-center space-x-1"
-          style={{ transform: `translateX(${offset}px)` }}
-        >
-          {getTrendIcon()}
-          <span>{sign}${formattedVelocity}/s</span>
+        {/* Icon */}
+        <div className="mr-1">
+          {getIcon()}
         </div>
+        
+        {/* Velocity text */}
+        <div className="font-mono text-xs">
+          {isPositive && '+'}
+          {formatVelocity()}
+          <span className="text-xs opacity-70">/sec</span>
+        </div>
+        
+        {/* Scrolling background effect */}
+        {!isNeutral && (
+          <div 
+            className={`absolute inset-0 bg-gradient-to-r ${
+              isPositive 
+                ? 'from-green-500/0 via-green-500/10 to-green-500/0' 
+                : 'from-red-500/0 via-red-500/10 to-red-500/0'
+            } ${getAnimationSpeed()}`}
+            style={{ 
+              width: '200%',
+              transform: 'translateX(-50%)'
+            }}
+          ></div>
+        )}
+      </div>
+      
+      {/* Tooltip */}
+      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+        {getTooltip()}
       </div>
     </div>
   );

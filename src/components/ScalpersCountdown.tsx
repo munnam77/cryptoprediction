@@ -9,27 +9,25 @@ interface ScalpersCountdownProps {
 
 /**
  * ScalpersCountdown Component
- * Shows circular timer countdown until next data refresh
+ * Shows a circular timer counting down to the next data refresh
  */
-const ScalpersCountdown: React.FC<ScalpersCountdownProps> = ({ 
-  seconds, 
+const ScalpersCountdown: React.FC<ScalpersCountdownProps> = ({
+  seconds,
   timeframe,
   className = ''
 }) => {
-  const [remainingSeconds, setRemainingSeconds] = useState(seconds);
+  const [countdown, setCountdown] = useState(seconds);
   
+  // Update countdown every second
   useEffect(() => {
-    // Reset when seconds prop changes
-    setRemainingSeconds(seconds);
+    setCountdown(seconds);
     
-    // Set up the countdown timer
     const timer = setInterval(() => {
-      setRemainingSeconds(prevSeconds => {
-        if (prevSeconds <= 1) {
-          clearInterval(timer);
-          return 0;
+      setCountdown(prev => {
+        if (prev <= 0) {
+          return seconds; // Reset to initial value when it reaches zero
         }
-        return prevSeconds - 1;
+        return prev - 1;
       });
     }, 1000);
     
@@ -38,85 +36,87 @@ const ScalpersCountdown: React.FC<ScalpersCountdownProps> = ({
   
   // Format time for display
   const formatTime = () => {
-    if (remainingSeconds < 60) {
-      return `${remainingSeconds}s`;
-    } 
-    
-    const minutes = Math.floor(remainingSeconds / 60);
-    const secs = remainingSeconds % 60;
-    
-    if (minutes < 60) {
-      return `${minutes}m ${secs}s`;
+    if (countdown < 60) {
+      return `${countdown}s`;
+    } else if (countdown < 3600) {
+      const minutes = Math.floor(countdown / 60);
+      const secs = countdown % 60;
+      return `${minutes}m${secs > 0 ? ` ${secs}s` : ''}`;
+    } else {
+      const hours = Math.floor(countdown / 3600);
+      const minutes = Math.floor((countdown % 3600) / 60);
+      return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`;
     }
-    
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    
-    return `${hours}h ${mins}m`;
   };
   
-  // Calculate percentage for the circle
-  const calculatePercentage = () => {
-    let totalSeconds = 0;
-    
+  // Calculate progress percentage (0-100)
+  const getProgress = () => {
+    let totalSeconds;
     switch (timeframe) {
       case '15m': totalSeconds = 15 * 60; break;
       case '30m': totalSeconds = 30 * 60; break;
       case '1h': totalSeconds = 60 * 60; break;
       case '4h': totalSeconds = 4 * 60 * 60; break;
       case '1d': totalSeconds = 24 * 60 * 60; break;
+      default: totalSeconds = 60 * 60;
     }
     
-    return 100 - ((remainingSeconds / totalSeconds) * 100);
+    return 100 - (countdown / totalSeconds * 100);
   };
   
-  // Determine color based on remaining time
+  // Get color based on remaining time
   const getColor = () => {
-    if (remainingSeconds < 60) return '#ef4444'; // Red for < 1 minute
-    if (remainingSeconds < 5 * 60) return '#f59e0b'; // Amber for < 5 minutes
-    return '#3b82f6'; // Blue for >= 5 minutes
+    if (countdown < 60) return 'text-red-500'; // Less than 1 minute
+    if (countdown < 300) return 'text-yellow-500'; // Less than 5 minutes
+    return 'text-green-500';
   };
   
-  const circleSize = 30;
-  const strokeWidth = 3;
-  const radius = (circleSize - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const strokeDashoffset = circumference - (calculatePercentage() / 100) * circumference;
+  // Calculate stroke dash values for circle progress
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference - (getProgress() / 100) * circumference;
   
   return (
-    <div className={`flex items-center ${className}`}>
-      <div className="relative flex-shrink-0">
-        <svg width={circleSize} height={circleSize} viewBox={`0 0 ${circleSize} ${circleSize}`}>
+    <div className={`relative group ${className}`}>
+      <div className="flex items-center">
+        {/* SVG Circle Progress */}
+        <svg width="40" height="40" className="transform -rotate-90">
           {/* Background circle */}
           <circle
-            cx={circleSize / 2}
-            cy={circleSize / 2}
+            cx="20"
+            cy="20"
             r={radius}
-            fill="none"
-            stroke="#1f2937"
-            strokeWidth={strokeWidth}
+            fill="transparent"
+            stroke="#374151"
+            strokeWidth="3"
           />
+          
           {/* Progress circle */}
           <circle
-            cx={circleSize / 2}
-            cy={circleSize / 2}
+            cx="20"
+            cy="20"
             r={radius}
-            fill="none"
-            stroke={getColor()}
-            strokeWidth={strokeWidth}
-            strokeDasharray={circumference}
+            fill="transparent"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeDasharray={strokeDasharray}
             strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${circleSize / 2} ${circleSize / 2})`}
+            className={getColor()}
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Clock className="w-3 h-3 text-gray-300" />
+        
+        {/* Time display */}
+        <div className="ml-2">
+          <div className="text-xs text-gray-400">Next Update</div>
+          <div className={`text-sm font-medium ${getColor()}`}>{formatTime()}</div>
         </div>
       </div>
-      <span className="ml-2 text-xs font-medium" style={{ color: getColor() }}>
-        {formatTime()} to {timeframe} update
-      </span>
+      
+      {/* Tooltip */}
+      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+        {`${formatTime()} until ${timeframe} update`}
+      </div>
     </div>
   );
 };
