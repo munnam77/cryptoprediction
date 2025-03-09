@@ -1,82 +1,75 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from './MainLayout';
 import DynamicBackgroundShift from './DynamicBackgroundShift';
+import TopNavigationBar from './TopNavigationBar';
 import BinanceService from '../services/BinanceService';
 import { MarketData } from '../services/BinanceService';
-import mockData from '../data/mockMarketData';
 
-/**
- * AppContainer - Main application container
- * Integrates all dashboard components and manages global state
- */
 const AppContainer: React.FC = () => {
-  // State for market data and metrics
+  // Market state
   const [marketState, setMarketState] = useState({
-    sentiment: 50, // 0-100
-    volatility: 30, // 0-100
-    marketChange: 0, // percentage
-    btcChangePercent: 0,
+    sentiment: 65, // 0-100
+    volatility: 45, // 0-100
+    marketChange: 2.5, // percentage
+    btcChangePercent: 1.2,
     selectedTimeframe: '1h' as '15m' | '30m' | '1h' | '4h' | '1d'
   });
-  
-  // Initialize with mock data for immediate UI display
-  const [topGainers, setTopGainers] = useState<MarketData[]>(mockData.topGainers);
-  const [lowCapGems, setLowCapGems] = useState<MarketData[]>(mockData.lowCapGems);
-  const [allMarketData, setAllMarketData] = useState<MarketData[]>(mockData.allMarketData);
-  const [isLoading, setIsLoading] = useState(false); // Set to false initially
+
+  // Data states
+  const [topGainers, setTopGainers] = useState<MarketData[]>([]);
+  const [lowCapGems, setLowCapGems] = useState<MarketData[]>([]);
+  const [allMarketData, setAllMarketData] = useState<MarketData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataInitialized, setDataInitialized] = useState(false);
-  
-  // Fetch initial market data
+
+  // Initial data load
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Don't show loading state on initial load since we have mock data
-        
-        // Get market mood
+        // Get market mood data
         const moodData = await BinanceService.getMarketMood();
-        setMarketState({
+        setMarketState(prev => ({
+          ...prev,
           sentiment: moodData.sentiment,
           volatility: moodData.volatility,
           marketChange: moodData.marketChangePercent,
-          btcChangePercent: moodData.btcChangePercent,
-          selectedTimeframe: '1h'
-        });
-        
-        // Get top gainers data
+          btcChangePercent: moodData.btcChangePercent
+        }));
+
+        // Get initial data for all sections
         const gainersData = await BinanceService.getTopGainers('1h', 10);
         if (gainersData.length > 0) {
           setTopGainers(gainersData);
         }
-        
-        // Get low-cap gems data
+
         const gemsData = await BinanceService.getLowCapGems('1h', 10);
         if (gemsData.length > 0) {
           setLowCapGems(gemsData);
         }
-        
-        // Get comprehensive market data
+
         const marketData = await BinanceService.getComprehensiveMarketData('1h');
         if (marketData.length > 0) {
           setAllMarketData(marketData);
         }
-        
+
         setDataInitialized(true);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching initial data:', error);
-        // Don't show error if we have mock data already displaying
-        // setError('Failed to load market data. Please try again later.');
+        setError('Failed to load market data. Please try again later.');
+        setIsLoading(false);
       }
     };
-    
+
     fetchInitialData();
   }, []);
-  
+
   // Refresh data periodically
   useEffect(() => {
+    if (!dataInitialized) return;
+
     const refreshInterval = setInterval(async () => {
-      if (!dataInitialized) return; // Don't refresh until initial real data is loaded
-      
       try {
         // Update market mood
         const moodData = await BinanceService.getMarketMood();
@@ -87,66 +80,64 @@ const AppContainer: React.FC = () => {
           marketChange: moodData.marketChangePercent,
           btcChangePercent: moodData.btcChangePercent
         }));
-        
-        // Update top gainers and low cap gems for the selected timeframe
+
+        // Update all data sections
         const gainersData = await BinanceService.getTopGainers(marketState.selectedTimeframe, 10);
         if (gainersData.length > 0) {
           setTopGainers(gainersData);
         }
-        
+
         const gemsData = await BinanceService.getLowCapGems(marketState.selectedTimeframe, 10);
         if (gemsData.length > 0) {
           setLowCapGems(gemsData);
         }
-        
+
+        const marketData = await BinanceService.getComprehensiveMarketData(marketState.selectedTimeframe);
+        if (marketData.length > 0) {
+          setAllMarketData(marketData);
+        }
+
       } catch (error) {
         console.error('Error refreshing data:', error);
       }
     }, 60000); // Refresh every minute
-    
+
     return () => clearInterval(refreshInterval);
   }, [marketState.selectedTimeframe, dataInitialized]);
-  
+
   // Handle timeframe change
   const handleTimeframeChange = async (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => {
     setMarketState(prev => ({
       ...prev,
       selectedTimeframe: timeframe
     }));
-    
+
     try {
-      // Only show loading state if we have real data already
-      if (dataInitialized) {
-        setIsLoading(true);
-      }
-      
-      // Get data for the new timeframe
+      setIsLoading(true);
+
       const gainersData = await BinanceService.getTopGainers(timeframe, 10);
       if (gainersData.length > 0) {
         setTopGainers(gainersData);
       }
-      
+
       const gemsData = await BinanceService.getLowCapGems(timeframe, 10);
       if (gemsData.length > 0) {
         setLowCapGems(gemsData);
       }
-      
+
       const marketData = await BinanceService.getComprehensiveMarketData(timeframe);
       if (marketData.length > 0) {
         setAllMarketData(marketData);
       }
-      
+
       setIsLoading(false);
     } catch (error) {
       console.error(`Error fetching data for timeframe ${timeframe}:`, error);
-      // Don't show error if we have data already
-      if (dataInitialized) {
-        setError(`Failed to load data for ${timeframe} timeframe.`);
-        setIsLoading(false);
-      }
+      setError(`Failed to load data for ${timeframe} timeframe.`);
+      setIsLoading(false);
     }
   };
-  
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
@@ -163,18 +154,25 @@ const AppContainer: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
       {/* Dynamic background based on market sentiment */}
       <DynamicBackgroundShift
         marketSentiment={marketState.sentiment}
         volatility={marketState.volatility}
       />
-      
+
+      {/* Top Navigation */}
+      <TopNavigationBar
+        marketSentiment={marketState.sentiment}
+        btcChangePercent={marketState.btcChangePercent}
+        marketChangePercent={marketState.marketChange}
+      />
+
       {/* Main layout with all panels */}
       <MainLayout 
-        marketSentiment={marketState.sentiment} 
+        marketSentiment={marketState.sentiment}
         marketVolatility={marketState.volatility}
         btcChangePercent={marketState.btcChangePercent}
         marketChangePercent={marketState.marketChange}

@@ -2,7 +2,7 @@ import React from 'react';
 
 interface MicroRSIBarProps {
   value: number; // 0-100
-  period?: number;
+  period?: number; // RSI period (default 14)
   width?: number;
   height?: number;
   className?: string;
@@ -10,29 +10,35 @@ interface MicroRSIBarProps {
 
 /**
  * MicroRSIBar Component
- * Tiny RSI indicator with color zones
+ * Small visual indicator showing RSI value with color coding for overbought/oversold conditions
  */
 const MicroRSIBar: React.FC<MicroRSIBarProps> = ({
   value,
   period = 14,
-  width = 60,
+  width = 100,
   height = 6,
   className = ''
 }) => {
-  // Ensure value is between 0-100
-  const rsiValue = Math.min(Math.max(value, 0), 100);
+  // Ensure value is within 0-100 range
+  const safeValue = Math.min(Math.max(value, 0), 100);
   
-  // Calculate position for the marker
-  const markerPosition = (rsiValue / 100) * width;
+  // Determine marker position
+  const markerPosition = `${safeValue}%`;
+  
+  // Get color based on RSI value
+  const getMarkerColor = () => {
+    if (safeValue >= 70) return '#ef4444'; // Red (overbought)
+    if (safeValue <= 30) return '#3b82f6'; // Blue (oversold)
+    return '#22c55e'; // Green (neutral)
+  };
   
   // Get tooltip text
   const getTooltip = () => {
-    let condition = '';
-    if (rsiValue >= 70) condition = 'Overbought';
-    else if (rsiValue <= 30) condition = 'Oversold';
-    else condition = 'Neutral';
+    let status = 'Neutral';
+    if (safeValue >= 70) status = 'Overbought';
+    if (safeValue <= 30) status = 'Oversold';
     
-    return `RSI-${period}: ${rsiValue.toFixed(1)} (${condition})`;
+    return `RSI-${period}: ${safeValue.toFixed(1)} (${status})`;
   };
   
   return (
@@ -48,7 +54,7 @@ const MicroRSIBar: React.FC<MicroRSIBarProps> = ({
         <div 
           className="w-full h-full relative"
           style={{ 
-            background: 'linear-gradient(to right, #ef4444, #eab308, #22c55e, #eab308, #ef4444)',
+            background: 'linear-gradient(to right, #3b82f6, #22c55e, #ef4444)',
             backgroundSize: '100% 100%',
             backgroundPosition: 'left center'
           }}
@@ -61,14 +67,15 @@ const MicroRSIBar: React.FC<MicroRSIBarProps> = ({
       
       {/* Current value marker */}
       <div 
-        className="absolute top-0 w-1 h-full bg-white border border-gray-800 dark:border-white rounded-full transform -translate-x-1/2"
-        style={{ left: `${markerPosition}px` }}
+        className="absolute top-0 transform -translate-x-1/2"
+        style={{ 
+          left: markerPosition, 
+          height: `${height + 4}px`,
+          width: '3px',
+          backgroundColor: getMarkerColor(),
+          borderRadius: '1px'
+        }}
       />
-      
-      {/* Value text */}
-      <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 dark:text-gray-400">
-        {rsiValue.toFixed(1)}
-      </div>
     </div>
   );
 };

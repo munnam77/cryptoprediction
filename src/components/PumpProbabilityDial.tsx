@@ -2,100 +2,109 @@ import React from 'react';
 
 interface PumpProbabilityDialProps {
   probability: number; // 0-100
-  timeframe: string;
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
   className?: string;
-  size?: number;
 }
 
 /**
  * PumpProbabilityDial Component
- * Semicircular gauge showing likelihood of price pump
+ * Shows the probability of a price pump in the selected timeframe
  */
 const PumpProbabilityDial: React.FC<PumpProbabilityDialProps> = ({
-  probability,
+  probability = 0,
   timeframe,
-  className = '',
-  size = 80
+  className = ''
 }) => {
-  // Ensure probability is between 0-100
-  const validProbability = Math.min(Math.max(probability, 0), 100);
+  // Ensure probability is within 0-100 range
+  const validProbability = Math.min(Math.max(Math.round(probability), 0), 100);
   
-  // Calculate dimensions
-  const radius = size / 2;
-  const strokeWidth = 6;
-  const normalizedRadius = radius - strokeWidth / 2;
-  const circumference = normalizedRadius * Math.PI;
-  
-  // Calculate stroke dash based on probability (semicircle)
-  const strokeDasharray = `${circumference} ${circumference}`;
+  // Calculate SVG parameters
+  const size = 40;
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (validProbability / 100) * circumference;
   
-  // Get color based on probability
+  // Get color based on probability value
   const getColor = () => {
-    if (validProbability >= 70) return 'text-green-500';
-    if (validProbability >= 40) return 'text-yellow-500';
-    return 'text-red-500';
+    if (validProbability < 30) return '#9ca3af'; // Gray for low probability
+    if (validProbability < 60) return '#facc15'; // Yellow for medium probability
+    if (validProbability < 80) return '#fb923c'; // Orange for high probability
+    return '#4ade80'; // Green for very high probability
   };
   
-  // Get label text
-  const getLabel = () => {
-    if (validProbability >= 70) return 'High';
-    if (validProbability >= 40) return 'Medium';
-    return 'Low';
+  const color = getColor();
+  
+  // Get appropriate label for the timeframe
+  const getTimeframeLabel = () => {
+    switch (timeframe) {
+      case '15m': return '15m';
+      case '30m': return '30m';
+      case '1h': return '1h';
+      case '4h': return '4h';
+      case '1d': return '1d';
+      default: return timeframe;
+    }
   };
   
   // Get tooltip text
-  const getTooltip = () => {
-    return `Pump probability: ${validProbability}% (${getLabel()}) for ${timeframe} timeframe`;
+  const getTooltipText = () => {
+    let strength = 'Low';
+    if (validProbability >= 30) strength = 'Moderate';
+    if (validProbability >= 60) strength = 'High';
+    if (validProbability >= 80) strength = 'Very High';
+    
+    return `${strength} probability (${validProbability}%) of price pump in ${getTimeframeLabel()} timeframe`;
   };
   
   return (
     <div 
-      className={`relative flex flex-col items-center ${className}`}
-      title={getTooltip()}
+      className={`relative inline-flex items-center ${className}`}
+      title={getTooltipText()}
     >
-      <svg
-        height={radius}
-        width={size}
-        className="transform rotate-180"
-      >
-        {/* Background semicircle */}
-        <path
-          d={`
-            M ${strokeWidth/2}, ${radius}
-            a ${normalizedRadius}, ${normalizedRadius} 0 1,1 ${size - strokeWidth}, 0
-          `}
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="#1f2937"
           strokeWidth={strokeWidth}
-          className="text-gray-200 dark:text-gray-700"
         />
         
-        {/* Foreground semicircle (progress) */}
-        <path
-          d={`
-            M ${strokeWidth/2}, ${radius}
-            a ${normalizedRadius}, ${normalizedRadius} 0 1,1 ${size - strokeWidth}, 0
-          `}
+        {/* Probability circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke={color}
           strokeWidth={strokeWidth}
-          strokeDasharray={strokeDasharray}
+          strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
-          className={getColor()}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{
+            transition: 'stroke-dashoffset 0.5s ease, stroke 0.5s ease'
+          }}
         />
       </svg>
       
       {/* Probability text */}
-      <div className="flex flex-col items-center mt-1">
-        <span className={`text-lg font-bold ${getColor()}`}>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span 
+          className="text-xs font-semibold"
+          style={{ color }}
+        >
           {validProbability}%
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          {getLabel()}
-        </span>
       </div>
+      
+      {/* Timeframe indicator */}
+      <span className="ml-1 text-xs text-gray-400">
+        {getTimeframeLabel()}
+      </span>
     </div>
   );
 };

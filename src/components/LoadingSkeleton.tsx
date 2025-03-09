@@ -1,43 +1,71 @@
 import React from 'react';
 
 interface LoadingSkeletonProps {
-  type?: 'text' | 'card' | 'chart';
+  type: 'table' | 'cards' | 'predictions';
+  rows?: number;
   count?: number;
 }
 
-function LoadingSkeleton({ type = 'text', count = 1 }: LoadingSkeletonProps) {
-  const renderSkeleton = () => {
-    switch (type) {
-      case 'card':
-        return (
-          <div className="bg-gray-700 rounded-lg p-4 animate-pulse">
-            <div className="h-4 bg-gray-600 rounded w-3/4 mb-4"></div>
-            <div className="space-y-3">
-              <div className="h-3 bg-gray-600 rounded"></div>
-              <div className="h-3 bg-gray-600 rounded w-5/6"></div>
-            </div>
-          </div>
-        );
-      case 'chart':
-        return (
-          <div className="bg-gray-700 rounded-lg p-4 animate-pulse">
-            <div className="h-48 bg-gray-600 rounded"></div>
-          </div>
-        );
-      default:
-        return (
-          <div className="h-4 bg-gray-600 rounded animate-pulse"></div>
-        );
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i}>{renderSkeleton()}</div>
+/**
+ * LoadingSkeleton Component
+ * Provides animated loading states for different parts of the UI
+ */
+const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ 
+  type, 
+  rows = 5,
+  count = 3 
+}) => {
+  const renderTableSkeleton = () => (
+    <div className="animate-pulse">
+      <div className="h-6 bg-gray-700 rounded mb-3 w-full"></div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="grid grid-cols-5 gap-2 mb-2">
+          <div className="h-8 bg-gray-700 rounded col-span-1"></div>
+          <div className="h-8 bg-gray-700 rounded col-span-1"></div>
+          <div className="h-8 bg-gray-700 rounded col-span-1"></div>
+          <div className="h-8 bg-gray-700 rounded col-span-1"></div>
+          <div className="h-8 bg-gray-700 rounded col-span-1"></div>
+        </div>
       ))}
     </div>
   );
-}
+
+  const renderCardsSkeleton = () => (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 animate-pulse">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="bg-gray-700 rounded-lg h-[120px]"></div>
+      ))}
+    </div>
+  );
+  
+  const renderPredictionsSkeleton = () => (
+    <div className="animate-pulse">
+      <div className="flex justify-between mb-3">
+        <div className="h-5 bg-gray-700 rounded w-1/3"></div>
+        <div className="h-5 bg-gray-700 rounded w-1/4"></div>
+      </div>
+      <div className="h-6 bg-gray-700 rounded mb-3 w-full"></div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2 mb-2">
+          <div className="h-8 bg-gray-700 rounded"></div>
+          <div className="h-8 bg-gray-700 rounded"></div>
+          <div className="h-8 bg-gray-700 rounded"></div>
+          <div className="h-8 bg-gray-700 rounded"></div>
+        </div>
+      ))}
+    </div>
+  );
+
+  switch (type) {
+    case 'table':
+      return renderTableSkeleton();
+    case 'cards':
+      return renderCardsSkeleton();
+    case 'predictions':
+      return renderPredictionsSkeleton();
+    default:
+      return null;
+  }
+};
 
 export default LoadingSkeleton;

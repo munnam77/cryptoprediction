@@ -1,241 +1,302 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import VolumeChangeTrendline from './VolumeChangeTrendline';
-import LiquidityDepthGauge from './LiquidityDepthGauge';
-import FlashSentimentSpike from './FlashSentimentSpike';
-import HistoricalVolatilityBadge from './HistoricalVolatilityBadge';
-import AudioPing from './AudioPing';
+import React, { useState, useEffect } from 'react';
+import { Clock } from 'lucide-react';
 import { MarketData } from '../services/BinanceService';
+import VolatilityVolumeCorrelationDot from './VolatilityVolumeCorrelationDot';
+import HistoricalVolatilityBadge from './HistoricalVolatilityBadge';
+import FlashSentimentSpike from './FlashSentimentSpike';
+import MicroAchievementBadge from './MicroAchievementBadge';
+import TimeframeVolatilityRank from './TimeframeVolatilityRank';
+import LiquidityDepthGauge from './LiquidityDepthGauge';
+import VolumeDecayWarning from './VolumeDecayWarning';
+import PumpCycleTag from './PumpCycleTag';
+import AudioPing from './AudioPing';
 
 interface TopGainersCarouselProps {
   gainers: MarketData[];
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  audioPingEnabled: boolean;
+  onToggleAudioPing: () => void;
+  isHistoricalView?: boolean;
+  historicalTimestamp?: number;
 }
 
 /**
- * TopGainersCarousel - Displays a horizontal scrollable list of top performing coins
- * Shows real-time data for the top gainers with various indicators
+ * Carousel of top performing coins with special features as described in context.md
+ * - Features displayed: 
+ * 1. Volume Change % Trendline
+ * 2. Liquidity Depth Gauge
+ * 3. Volatility vs. Volume Correlation Dot 
+ * 4. Historical Volatility Badge
+ * 5. Flash Sentiment Spike
+ * 6. Micro Achievement Badge
+ * 7. Timeframe Volatility Rank
+ * 8. Audio Ping
+ * 9. Volume Decay Warning
+ * 10. Pump Cycle Tag
  */
-const TopGainersCarousel: React.FC<TopGainersCarouselProps> = ({ gainers }) => {
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-  
-  // Autoscroll every 5 seconds
+const TopGainersCarousel: React.FC<TopGainersCarouselProps> = ({ 
+  gainers, 
+  timeframe,
+  audioPingEnabled,
+  onToggleAudioPing,
+  isHistoricalView = false,
+  historicalTimestamp = Date.now()
+}) => {
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  // Auto-rotate carousel every 8 seconds (only if not in historical view)
   useEffect(() => {
+    if (isHistoricalView) return;
+    
     const interval = setInterval(() => {
-      if (gainers.length > 0) {
-        setActiveIndex((prevIndex) => (prevIndex + 1) % gainers.length);
-      }
-    }, 5000);
+      setCarouselIndex(prev => (prev + 1) % Math.max(1, Math.ceil(gainers.length / 3)));
+    }, 8000);
     
     return () => clearInterval(interval);
-  }, [gainers.length]);
-  
-  // Scroll to active card
+  }, [gainers.length, isHistoricalView]);
+
+  // Format helpers
+  const formatChangePercent = (value: number): string => {
+    return value > 0 ? `+${value.toFixed(2)}%` : `${value.toFixed(2)}%`;
+  };
+
+  const getColorClass = (value: number): string => {
+    return value > 0 ? 'text-green-400' : value < 0 ? 'text-red-400' : 'text-gray-300';
+  };
+
+  // Check if a coin has a new sentiment spike
+  const hasSentimentSpike = (coin: MarketData): boolean => {
+    return (coin.sentimentSpike !== undefined && coin.sentimentSpike > 50);
+  };
+
+  // Check if volume is decaying
+  const hasVolumeDecay = (coin: MarketData): boolean => {
+    return (coin.volumeDecay !== undefined && coin.volumeDecay > 30);
+  };
+
+  // Trigger audio ping for significant gainers (only in live view)
   useEffect(() => {
-    if (carouselRef.current && gainers.length > 0) {
-      const scrollAmount = activeIndex * (carouselRef.current.scrollWidth / gainers.length);
-      carouselRef.current.scrollTo({
-        left: scrollAmount,
-        behavior: 'smooth'
-      });
+    if (audioPingEnabled && gainers.length > 0 && !isHistoricalView) {
+      const significantGainer = gainers.find(g => g.priceChangePercent > 15);
+      if (significantGainer) {
+        const audioElement = document.getElementById('gainerPing') as HTMLAudioElement;
+        if (audioElement) audioElement.play();
+      }
     }
-  }, [activeIndex, gainers.length]);
-  
-  // Handle manual navigation
-  const handlePrev = () => {
-    setActiveIndex((prevIndex) => 
-      prevIndex === 0 ? gainers.length - 1 : prevIndex - 1
-    );
-  };
-  
-  const handleNext = () => {
-    setActiveIndex((prevIndex) => 
-      (prevIndex + 1) % gainers.length
-    );
-  };
-  
-  if (gainers.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full bg-gray-800 bg-opacity-30 rounded-lg p-6">
-        <div className="text-center text-gray-400">
-          <p>Loading top gainers data...</p>
-        </div>
-      </div>
-    );
-  }
-  
+  }, [gainers, audioPingEnabled, isHistoricalView]);
+
   return (
-    <div className="relative">
-      {/* Navigation buttons */}
-      <button 
-        onClick={handlePrev}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-gray-800 bg-opacity-70 rounded-full p-1 text-gray-300 hover:text-white focus:outline-none"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
+    <div className="h-full">
+      {/* Hidden audio element for pings */}
+      <AudioPing id="gainerPing" enabled={audioPingEnabled && !isHistoricalView} variant="success" />
       
-      <button 
-        onClick={handleNext}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-gray-800 bg-opacity-70 rounded-full p-1 text-gray-300 hover:text-white focus:outline-none"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
-      
-      {/* Carousel Container */}
-      <div 
-        ref={carouselRef}
-        className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        {gainers.map((gainer) => {
-          // Calculate additional metrics for features
-          const volumeChangePercent = gainer.volumeChangePercent || 0;
-          const priceChangePercent = gainer.priceChangePercent;
-          const volatility = gainer.volatility || 50;
-          const liquidity = gainer.liquidity || 50;
-          
-          // Generate volume history array for trendline (mock data based on current value)
-          const volumeHistory = [
-            volumeChangePercent * 0.7,
-            volumeChangePercent * 0.8,
-            volumeChangePercent * 0.9,
-            volumeChangePercent
-          ];
-          
-          // Determine liquidity trend
-          const liquidityTrend = volumeChangePercent > 5 
-            ? 'increasing' 
-            : volumeChangePercent < -5 
-              ? 'decreasing' 
-              : 'stable';
-          
-          // Determine if there's a sentiment spike (simulated)
-          const hasSentimentSpike = priceChangePercent > 8 || (priceChangePercent > 3 && volumeChangePercent > 15);
-          
-          // Map volatility to percentile (0-100)
-          const volatilityPercentile = Math.min(100, Math.max(0, volatility));
-          
-          // Audio ping for significant price movements
-          const needsAudioPing = priceChangePercent > 10;
-          
-          return (
-            <div 
-              key={gainer.symbol}
-              className="min-w-full snap-center px-6 py-3"
-            >
-              <div className="bg-gray-800 bg-opacity-40 backdrop-blur rounded-lg border border-gray-700 p-4 hover:border-indigo-500 transition-colors">
-                {/* Header with Coin Name & Price */}
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center">
-                    <span className="font-bold text-lg">{gainer.baseAsset}</span>
-                    <span className="text-xs text-gray-400 ml-1">{gainer.quoteAsset}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-300">
-                      ${gainer.price.toFixed(gainer.price < 1 ? 6 : 2)}
-                    </div>
-                    <div className={`text-xs font-bold ${priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%
-                    </div>
-                  </div>
-                </div>
+      {/* Header with audio toggle and historical indicator */}
+      <div className="flex justify-between items-center mb-3">
+        <div className="text-sm font-medium flex items-center">
+          {timeframe} Top Performers
+          {isHistoricalView && (
+            <span className="ml-2 text-xs px-1.5 py-0.5 bg-purple-800 rounded-md">
+              Historical
+            </span>
+          )}
+        </div>
+        
+        {/* Only show audio toggle in live mode */}
+        {!isHistoricalView && (
+          <button 
+            onClick={onToggleAudioPing}
+            className={`flex items-center px-2 py-1 rounded-full text-xs ${
+              audioPingEnabled ? 'bg-green-800 text-green-200' : 'bg-gray-700 text-gray-300'
+            }`}
+          >
+            <span className="mr-1">Audio</span>
+            <div className={`w-3 h-3 rounded-full ${audioPingEnabled ? 'bg-green-400' : 'bg-gray-500'}`}></div>
+          </button>
+        )}
+        
+        {/* Show timestamp in historical mode */}
+        {isHistoricalView && (
+          <div className="text-xs text-purple-300 flex items-center">
+            <Clock className="w-3 h-3 mr-1" />
+            {new Date(historicalTimestamp).toLocaleTimeString()}
+          </div>
+        )}
+      </div>
+
+      {/* Cards grid */}
+      <div className="grid grid-cols-3 gap-3">
+        {gainers.slice(carouselIndex * 3, carouselIndex * 3 + 3).map((coin, index) => (
+          <div 
+            key={coin.symbol} 
+            className={`relative flex flex-col justify-between rounded-lg p-2 border overflow-hidden ${
+              isHistoricalView 
+                ? 'bg-gradient-to-b from-purple-900/20 to-gray-900 border-purple-700'
+                : `bg-gradient-to-b from-purple-900/20 to-gray-900 border-gray-700 ${
+                    coin.priceChangePercent > 20 ? 'border-purple-500 border-opacity-50' : ''
+                  }`
+            }`}
+          >
+            {/* Historical corner badge */}
+            {isHistoricalView && (
+              <div className="absolute -top-1 -right-1 bg-purple-800 px-1 py-0.5 text-[10px] font-medium text-white z-10 rounded-bl">
+                Past
+              </div>
+            )}
+
+            {/* Coin identifiers */}
+            <div>
+              <div className="font-medium text-sm">
+                {coin.baseAsset}/{coin.quoteAsset}
+              </div>
+              <div className={`text-sm font-bold ${getColorClass(coin.priceChangePercent)}`}>
+                {formatChangePercent(coin.priceChangePercent)}
+              </div>
+            </div>
+
+            {/* Middle section with gauges/indicators */}
+            <div className="flex my-2 space-x-1 justify-center">
+              {/* Feature 2: Liquidity Depth Gauge */}
+              <LiquidityDepthGauge 
+                liquidity={coin.liquidity || 50}
+                className="w-6 h-12"
+              />
+              
+              {/* Feature 3: Correlation Dot */}
+              <VolatilityVolumeCorrelationDot 
+                volatility={coin.volatility || 50}
+                volumeChange={coin.volumeChangePercent}
+                className="w-6 h-12"
+              />
+            </div>
+
+            {/* Bottom bar with various indicators */}
+            <div className="flex items-end justify-between">
+              <div className="flex space-x-1">
+                {/* Feature 4: Historical Volatility Badge */}
+                <HistoricalVolatilityBadge 
+                  percentile={coin.volatilityRank !== undefined ? coin.volatilityRank : 50}
+                  timeframe={timeframe}
+                  className="h-5"
+                />
                 
-                {/* Middle Section with Main Stats */}
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {/* Volume Change % */}
-                  <div className="bg-gray-800 rounded-md p-2">
-                    <div className="text-xs text-gray-400 mb-1">Volume Change</div>
-                    <div className="flex items-center justify-between">
-                      <div className={`text-sm font-medium ${volumeChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {volumeChangePercent >= 0 ? '+' : ''}{volumeChangePercent.toFixed(1)}%
-                      </div>
-                      <VolumeChangeTrendline
-                        volumeHistory={volumeHistory}
-                        className="ml-2"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Liquidity Depth */}
-                  <div className="bg-gray-800 rounded-md p-2">
-                    <div className="text-xs text-gray-400 mb-1">Liquidity</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium">
-                        {liquidity.toFixed(0)}/100
-                      </div>
-                      <LiquidityDepthGauge
-                        depth={liquidity}
-                        trend={liquidityTrend}
-                        className="ml-2"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Bottom Section with Feature Indicators */}
-                <div className="flex items-center justify-between text-xs">
-                  {/* Left side features */}
-                  <div className="flex items-center space-x-2">
-                    {/* Historical Volatility Badge */}
-                    <HistoricalVolatilityBadge
-                      percentile={volatilityPercentile}
-                      timeframe="1h"
-                      className="text-xs"
-                    />
-                    
-                    {/* Flash Sentiment Spike - only shown when triggered */}
-                    {hasSentimentSpike && (
-                      <FlashSentimentSpike
-                        postCount={Math.round(priceChangePercent * 10)}
-                        active={true}
-                        className="ml-2"
-                      />
-                    )}
-                  </div>
-                  
-                  {/* Right side features */}
-                  <div className="flex items-center space-x-2">
-                    {/* Pump Cycle Tag */}
-                    {priceChangePercent > 5 && (
-                      <div className="px-2 py-0.5 bg-purple-500 bg-opacity-30 border border-purple-500 rounded-full text-purple-300 text-xs">
-                        Pump Cycle
-                      </div>
-                    )}
-                    
-                    {/* Volume Decay Warning */}
-                    {priceChangePercent > 0 && volumeChangePercent < -10 && (
-                      <div className="w-3 h-3 transform rotate-180 border-t-4 border-l-4 border-r-4 border-transparent border-t-gray-400 opacity-70" />
-                    )}
-                  </div>
-                </div>
-                
-                {/* Audio Ping - Hidden component that plays sound when needed */}
-                {needsAudioPing && (
-                  <AudioPing
-                    active={true}
-                    type={priceChangePercent >= 0 ? 'gain' : 'loss'}
-                    className="hidden"
+                {/* Feature 7: Timeframe Volatility Rank */}
+                {coin.volatilityRank !== undefined && coin.volatilityRank < 10 && (
+                  <TimeframeVolatilityRank
+                    rank={Math.ceil(coin.volatilityRank / 2)}
+                    timeframe={timeframe}
+                    className="h-5"
+                  />
+                )}
+              </div>
+              
+              <div>
+                {/* Feature 10: Pump Cycle Tag */}
+                {coin.pumpProbability !== undefined && coin.pumpProbability > 70 && (
+                  <PumpCycleTag 
+                    phase="accumulation"
+                    probability={coin.pumpProbability}
                   />
                 )}
               </div>
             </div>
-          );
-        })}
-      </div>
-      
-      {/* Pagination Indicators */}
-      <div className="flex justify-center mt-3">
-        {gainers.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setActiveIndex(index)}
-            className={`w-2 h-2 rounded-full mx-1 ${
-              index === activeIndex ? 'bg-indigo-500' : 'bg-gray-600'
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
+
+            {/* Overlays and special indicators - only show some animations in live mode */}
+            
+            {/* Feature 5: Flash Sentiment Spike */}
+            {hasSentimentSpike(coin) && !isHistoricalView && (
+              <FlashSentimentSpike 
+                level={coin.sentimentSpike || 0}
+                threshold={50}
+                className="absolute top-0 right-0"
+              />
+            )}
+            
+            {/* Feature 6: Micro Achievement Badge */}
+            {index === 0 && (
+              <MicroAchievementBadge 
+                achievement="top_gainer"
+                className="absolute top-1 left-1"
+              />
+            )}
+            
+            {/* Feature 9: Volume Decay Warning */}
+            {hasVolumeDecay(coin) && (
+              <VolumeDecayWarning 
+                decayLevel={coin.volumeDecay || 0}
+                threshold={30}
+                className="absolute bottom-1 left-1"
+                animate={!isHistoricalView}
+              />
+            )}
+            
+            {/* Feature 1: Volume Change % Trendline - as background overlay */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <svg width="100%" height="100%" className="opacity-20">
+                <defs>
+                  <linearGradient id={`volumeGradient-${coin.symbol}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor={coin.volumeChangePercent > 0 ? "#4ade80" : "#f87171"} />
+                    <stop offset="100%" stopColor="transparent" />
+                  </linearGradient>
+                </defs>
+                <path 
+                  d={`M0,${50 - coin.volumeChangePercent / 4} 
+                      Q${25},${50 - coin.volumeChangePercent / 2} 
+                      ${50},${50 - coin.volumeChangePercent / 3}
+                      T${100},${50 - coin.volumeChangePercent / 5}`}
+                  stroke={coin.volumeChangePercent > 0 ? "#4ade80" : "#f87171"}
+                  strokeWidth="1.5"
+                  fill="url(#volumeGradient-${coin.symbol})"
+                  strokeDasharray="5,3"
+                />
+              </svg>
+            </div>
+            
+            {/* Historical mode overlay */}
+            {isHistoricalView && (
+              <div className="absolute bottom-0 right-0 p-1">
+                <Clock className="w-3 h-3 text-purple-300" />
+              </div>
+            )}
+          </div>
         ))}
+
+        {/* Placeholder cards if needed */}
+        {gainers.length === 0 && (
+          <>
+            {[1, 2, 3].map(i => (
+              <div 
+                key={`placeholder-${i}`} 
+                className="bg-gray-800 bg-opacity-30 rounded-lg p-3 border border-gray-700 flex items-center justify-center"
+              >
+                <span className="text-gray-500 text-sm">Loading...</span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
+
+      {/* Pagination dots */}
+      {gainers.length > 3 && (
+        <div className="flex justify-center mt-3">
+          {Array.from({ length: Math.ceil(gainers.length / 3) }).map((_, i) => (
+            <button
+              key={i}
+              className={`w-2 h-2 rounded-full mx-1 ${
+                i === carouselIndex ? (isHistoricalView ? 'bg-purple-500' : 'bg-purple-500') : 'bg-gray-700'
+              }`}
+              onClick={() => setCarouselIndex(i)}
+              aria-label={`Go to page ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
+      
+      {/* Historical mode info text */}
+      {isHistoricalView && (
+        <div className="text-center mt-2 text-xs text-purple-300">
+          Historical top gainers from {new Date(historicalTimestamp).toLocaleDateString()}
+        </div>
+      )}
     </div>
   );
 };

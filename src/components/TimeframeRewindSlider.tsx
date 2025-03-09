@@ -1,123 +1,137 @@
-import React, { useState } from 'react';
-import { Rewind, Play } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock } from 'lucide-react';
 
 interface TimeframeRewindSliderProps {
-  maxRewindBars: number;
-  currentRewind: number;
-  onRewindChange: (bars: number) => void;
-  timeframe: string;
+  timestamp?: number; // Current timestamp (default to now)
+  maxRewind?: number; // Maximum rewind time in minutes
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  onUpdate?: (rewindTimestamp: number) => void;
   className?: string;
 }
 
 /**
  * TimeframeRewindSlider Component
- * Slider to rewind chart data to previous bars
+ * Allows users to rewind chart and data to view historical snapshots
  */
 const TimeframeRewindSlider: React.FC<TimeframeRewindSliderProps> = ({
-  maxRewindBars,
-  currentRewind,
-  onRewindChange,
+  timestamp = Date.now(),
+  maxRewind = 60, // Default 60 minutes
   timeframe,
+  onUpdate = () => {},
   className = ''
 }) => {
-  const [isRewinding, setIsRewinding] = useState(currentRewind > 0);
+  const [rewindMinutes, setRewindMinutes] = useState(0);
+  const [isActive, setIsActive] = useState(false);
+  
+  // Reset rewindMinutes when timeframe changes
+  useEffect(() => {
+    setRewindMinutes(0);
+  }, [timeframe]);
+  
+  // Convert rewindMinutes to appropriate label
+  const getRewindLabel = () => {
+    if (rewindMinutes === 0) {
+      return 'Current';
+    }
+    
+    if (rewindMinutes < 60) {
+      return `${rewindMinutes}m ago`;
+    }
+    
+    const hours = Math.floor(rewindMinutes / 60);
+    const mins = rewindMinutes % 60;
+    
+    if (hours < 24) {
+      return mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`;
+    }
+    
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    
+    return remainingHours > 0 ? `${days}d ${remainingHours}h ago` : `${days}d ago`;
+  };
+  
+  // Calculate timestamp based on rewind value
+  const getRewindTimestamp = () => {
+    return timestamp - (rewindMinutes * 60 * 1000);
+  };
+  
+  // Adjust max rewind based on timeframe
+  const getMaxRewind = () => {
+    switch (timeframe) {
+      case '15m': return Math.min(maxRewind, 60); // Max 1h for 15m timeframe
+      case '30m': return Math.min(maxRewind, 120); // Max 2h for 30m timeframe
+      case '1h': return Math.min(maxRewind, 24 * 60); // Max 24h for 1h timeframe
+      case '4h': return Math.min(maxRewind, 7 * 24 * 60); // Max 7d for 4h timeframe
+      case '1d': return Math.min(maxRewind, 30 * 24 * 60); // Max 30d for 1d timeframe
+      default: return maxRewind;
+    }
+  };
   
   // Handle slider change
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRewind = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
-    onRewindChange(value);
-    setIsRewinding(value > 0);
+    setRewindMinutes(value);
+    onUpdate(getRewindTimestamp());
   };
   
-  // Handle play button click
-  const handlePlayClick = () => {
-    onRewindChange(0);
-    setIsRewinding(false);
+  // Reset to current time
+  const resetToNow = () => {
+    setRewindMinutes(0);
+    onUpdate(timestamp);
   };
   
-  // Get tooltip text
-  const getTooltip = () => {
-    if (currentRewind === 0) {
-      return `Current ${timeframe} data (live)`;
-    } else {
-      return `Rewound ${currentRewind} ${timeframe} bars into the past`;
-    }
-  };
-  
-  // Get time description based on timeframe and rewind amount
-  const getTimeDescription = () => {
-    if (currentRewind === 0) return 'Live';
+  // Get appropriate color based on rewind value
+  const getColor = () => {
+    const percent = rewindMinutes / getMaxRewind();
     
-    let unit = '';
-    let amount = currentRewind;
-    
-    switch (timeframe) {
-      case '1m':
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '5m':
-        amount = amount * 5;
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '15m':
-        amount = amount * 15;
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '30m':
-        amount = amount * 30;
-        unit = amount === 1 ? 'minute' : 'minutes';
-        break;
-      case '1h':
-        unit = amount === 1 ? 'hour' : 'hours';
-        break;
-      case '4h':
-        amount = amount * 4;
-        unit = amount === 1 ? 'hour' : 'hours';
-        break;
-      case '1d':
-        unit = amount === 1 ? 'day' : 'days';
-        break;
-      default:
-        unit = 'bars';
-    }
-    
-    return `-${amount} ${unit}`;
+    if (percent === 0) return '#3b82f6'; // Blue for current
+    if (percent < 0.5) return '#6366f1'; // Indigo for recent history
+    if (percent < 0.75) return '#8b5cf6'; // Purple for older history
+    return '#a78bfa'; // Violet for oldest history
   };
   
   return (
-    <div 
-      className={`flex items-center space-x-2 ${className}`}
-      title={getTooltip()}
-    >
-      {/* Rewind icon */}
-      <Rewind 
-        className={`w-4 h-4 ${isRewinding ? 'text-blue-500' : 'text-gray-400'}`} 
-      />
-      
-      {/* Slider */}
-      <input
-        type="range"
-        min="0"
-        max={maxRewindBars}
-        value={currentRewind}
-        onChange={handleSliderChange}
-        className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-      />
-      
-      {/* Play button (return to live) */}
-      {isRewinding && (
-        <button
-          onClick={handlePlayClick}
-          className="p-1 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
+    <div className={`flex flex-col ${className}`}>
+      <div className="flex items-center justify-between mb-1">
+        <div 
+          className={`text-xs font-medium flex items-center cursor-pointer ${isActive ? 'text-blue-400' : 'text-gray-500'}`}
+          onClick={() => setIsActive(!isActive)}
         >
-          <Play className="w-3 h-3" />
-        </button>
-      )}
+          <Clock className="w-3 h-3 mr-1" />
+          <span>Timeframe Rewind</span>
+        </div>
+        <div className="text-xs font-medium" style={{ color: getColor() }}>
+          {getRewindLabel()}
+        </div>
+      </div>
       
-      {/* Time description */}
-      <span className={`text-xs font-mono ${isRewinding ? 'text-blue-500' : 'text-gray-500'}`}>
-        {getTimeDescription()}
-      </span>
+      {isActive && (
+        <div className="flex items-center space-x-2">
+          <input
+            type="range"
+            min="0"
+            max={getMaxRewind()}
+            value={rewindMinutes}
+            onChange={handleRewind}
+            className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, ${getColor()}, #4b5563)`,
+              accentColor: getColor()
+            }}
+          />
+          
+          {rewindMinutes > 0 && (
+            <button
+              onClick={resetToNow}
+              className="text-xs text-blue-500 hover:text-blue-400"
+              title="Reset to current time"
+            >
+              Now
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

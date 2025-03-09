@@ -1,262 +1,257 @@
-import React, { useState, useEffect } from 'react';
-import { TimeframeOption } from '../config/database.config';
-import { PredictionService } from '../services/prediction/PredictionService';
-import LoadingSkeleton from './LoadingSkeleton';
+import React, { useState } from 'react';
+import { MarketData } from '../services/BinanceService';
 
 interface PredictionDashboardProps {
-  timeframe: TimeframeOption;
+  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  predictedGainers: MarketData[];
+  actualGainers: MarketData[];
+  isHistoricalView?: boolean;
+  historicalTimestamp?: number;
 }
 
 /**
- * PredictionDashboard Component
- * Displays predictions for the selected timeframe with actual performance tracking
+ * Prediction Dashboard Component
+ * Displays predicted and actual top gainers for the selected timeframe
  */
-const PredictionDashboard: React.FC<PredictionDashboardProps> = ({ timeframe }) => {
-  const [predictions, setPredictions] = useState<any[]>([]);
-  const [actualTopGainers, setActualTopGainers] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+const PredictionDashboard: React.FC<PredictionDashboardProps> = ({
+  timeframe,
+  predictedGainers,
+  actualGainers,
+  isHistoricalView = false,
+  historicalTimestamp = Date.now()
+}) => {
+  const [activeTab, setActiveTab] = useState<'predictions' | 'performance'>('predictions');
 
-  useEffect(() => {
-    fetchPredictions();
-
-    // Refresh based on timeframe frequency
-    let refreshInterval: number;
-    switch (timeframe) {
-      case '15m':
-        refreshInterval = 15 * 60 * 1000; // 15 minutes
-        break;
-      case '30m':
-        refreshInterval = 30 * 60 * 1000; // 30 minutes
-        break;
-      case '1h':
-        refreshInterval = 60 * 60 * 1000; // 1 hour
-        break;
-      case '4h':
-        refreshInterval = 4 * 60 * 60 * 1000; // 4 hours
-        break;
-      case '1d':
-      default:
-        refreshInterval = 24 * 60 * 60 * 1000; // 1 day
-        break;
-    }
-
-    const intervalId = setInterval(fetchPredictions, refreshInterval);
-
-    return () => {
-      clearInterval(intervalId);
+  // Format the time for header display based on timeframe
+  const getHeaderTime = (): string => {
+    // Use historical timestamp if in historical view mode
+    const dateToUse = isHistoricalView ? new Date(historicalTimestamp) : new Date();
+    
+    const timeOptions: Intl.DateTimeFormatOptions = { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      timeZoneName: 'short' 
     };
-  }, [timeframe]);
 
-  const fetchPredictions = async () => {
-    try {
-      setLoading(true);
-
-      // Get predictions for the current timeframe
-      const allPredictions = await PredictionService.getTopPredictionsAllTimeframes(5);
-      const timeframePredictions = allPredictions?.[timeframe] || [];
-      setPredictions(timeframePredictions);
-
-      // For this demo, we'll simulate actual top gainers
-      // In a real implementation, we would fetch actual market data
-      const simulatedTopGainers = timeframePredictions.slice()
-        .sort(() => Math.random() - 0.5) // Shuffle
-        .map(pred => ({
-          ...pred,
-          actual_change_pct: (Math.random() * 20) - 5, // -5% to +15%
-          volume_change_pct: (Math.random() * 50) - 10, // -10% to +40%
-        }))
-        .sort((a, b) => b.actual_change_pct - a.actual_change_pct);
-
-      setActualTopGainers(simulatedTopGainers);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch predictions'));
-      console.error('Error in PredictionDashboard component:', err);
-    } finally {
-      setLoading(false);
+    // Add time indication based on timeframe
+    let timeStr = dateToUse.toLocaleTimeString('en-US', timeOptions);
+    
+    // Replace the timezone with JST for 1d timeframe as per context.md
+    if (timeframe === '1d') {
+      timeStr = timeStr.split(' ')[0] + ' JST';
     }
+    
+    return timeStr;
   };
 
-  // Format percentages
-  const formatPercent = (value: number | null, decimals: number = 2) => {
-    if (value === null || value === undefined) return 'N/A';
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value.toFixed(decimals)}%`;
-  };
-
-  // Format time
-  const formatTime = (date: Date | null) => {
-    if (!date) return '';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Format date
-  const formatDate = (date: Date | null) => {
-    if (!date) return '';
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  // Get color class based on percentage value
-  const getColorClass = (value: number | null) => {
-    if (value === null || value === undefined) return '';
-    return value >= 0
-      ? 'text-green-500 dark:text-green-400'
-      : 'text-red-500 dark:text-red-400';
-  };
-
-  // Get confidence color
-  const getConfidenceColor = (value: number) => {
-    if (value >= 80) return 'bg-green-500';
-    if (value >= 60) return 'bg-green-400';
-    if (value >= 40) return 'bg-yellow-400';
-    return 'bg-orange-400';
+  // Format percent values with color classes
+  const formatPercentWithColor = (value: number) => {
+    const colorClass = value >= 0 ? 'text-green-400' : 'text-red-400';
+    const formatted = value >= 0 ? `+${value.toFixed(2)}%` : `${value.toFixed(2)}%`;
+    return <span className={colorClass}>{formatted}</span>;
   };
 
   return (
-    <div>
-      <div className="mb-4 flex justify-between items-center">
-        <div>
-          <h3 className="text-md font-medium text-gray-700 dark:text-gray-300">
-            {timeframe} Predictions
-          </h3>
-          {lastUpdated && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Made at {formatTime(lastUpdated)}, {formatDate(lastUpdated)}
+    <div className="bg-gray-800 bg-opacity-40 rounded-lg p-3">
+      {/* Header with timeframe indication */}
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="text-sm font-medium flex items-center">
+          {timeframe} Predictions, {getHeaderTime()}
+          {isHistoricalView && (
+            <span className="ml-2 text-xs px-1.5 py-0.5 bg-purple-800 rounded-md">
+              Historical
             </span>
           )}
+        </h3>
+        
+        {/* Tab switcher */}
+        <div className="flex bg-gray-700 bg-opacity-50 rounded-md">
+          <button
+            className={`px-3 py-1 text-xs rounded-md ${
+              activeTab === 'predictions' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-gray-300'
+            }`}
+            onClick={() => setActiveTab('predictions')}
+          >
+            Predictions
+          </button>
+          <button
+            className={`px-3 py-1 text-xs rounded-md ${
+              activeTab === 'performance' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-gray-300'
+            }`}
+            onClick={() => setActiveTab('performance')}
+          >
+            Actual
+          </button>
         </div>
-        <button
-          onClick={fetchPredictions}
-          className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
       </div>
 
-      {loading ? (
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-          <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-          <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        </div>
-      ) : error ? (
-        <div className="text-center py-4 text-red-500">
-          Error loading predictions. Please try again.
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Predicted Gainers */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Predicted Top Gainers
-            </h4>
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-              {predictions.length === 0 ? (
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-2">
-                  No predictions available for this timeframe
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {predictions.slice(0, 5).map((pred) => (
-                    <div
-                      key={`pred-${pred.trading_pair}`}
-                      className="flex justify-between items-center"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                          {pred.trading_pair}
-                        </span>
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full text-white ${getConfidenceColor(pred.confidence_score)}`}>
-                          {Math.round(pred.confidence_score)}%
-                        </span>
-                      </div>
-                      <div className={`text-sm font-medium ${getColorClass(pred.predicted_change_pct)}`}>
-                        {formatPercent(pred.predicted_change_pct)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Actual Performance */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Actual Performance
-            </h4>
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-              {predictions.length === 0 ? (
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-2">
-                  No data available
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {predictions.slice(0, 5).map((pred) => {
-                    // Find actual performance
-                    const actual = actualTopGainers.find(
-                      (act) => act.trading_pair === pred.trading_pair
-                    );
-                    const actualChange = actual?.actual_change_pct ?? null;
-
-                    return (
-                      <div
-                        key={`actual-${pred.trading_pair}`}
-                        className="flex justify-between items-center"
-                      >
-                        <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                          {pred.trading_pair}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-sm font-medium ${getColorClass(actualChange)}`}>
-                            {formatPercent(actualChange)}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            vs {formatPercent(pred.predicted_change_pct)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Actual Top Gainers */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Actual Top Gainers
-            </h4>
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-              <div className="space-y-3">
-                {actualTopGainers.slice(0, 5).map((gainer) => (
-                  <div
-                    key={`gainer-${gainer.trading_pair}`}
-                    className="flex justify-between items-center"
+      {/* Predictions Table */}
+      {activeTab === 'predictions' && (
+        <div className="overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="text-xs text-gray-400">
+                <th className="px-2 py-2 text-left">Coin</th>
+                <th className="px-2 py-2 text-right">Pred. Gain</th>
+                <th className="px-2 py-2 text-right">Conf.</th>
+                <th className="px-2 py-2 text-right">Vol Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              {predictedGainers.map((coin, index) => {
+                // Calculate a confidence score if one isn't provided
+                const confidence = coin.signalStrength || Math.round(65 + Math.random() * 20);
+                
+                // Calculate predicted gain
+                const predictedGain = coin.profitTarget || (coin.priceChangePercent * 1.2);
+                
+                return (
+                  <tr 
+                    key={coin.symbol}
+                    className={`border-b border-gray-700/30 ${index < 3 ? 'bg-indigo-900/10' : ''}`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                        {gainer.trading_pair}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Vol: {formatPercent(gainer.volume_change_pct)}
-                      </span>
-                    </div>
-                    <div className={`text-sm font-medium ${getColorClass(gainer.actual_change_pct)}`}>
-                      {formatPercent(gainer.actual_change_pct)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center">
+                        {index < 3 && (
+                          <span className="w-4 h-4 flex items-center justify-center mr-1 rounded-full bg-indigo-500 text-xs">
+                            {index + 1}
+                          </span>
+                        )}
+                        <span className="font-medium">{coin.baseAsset}</span>
+                        <span className="ml-1 text-xs text-gray-400">{coin.quoteAsset}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      {formatPercentWithColor(predictedGain)}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      <div className="inline-flex items-center">
+                        <span className="mr-1">{confidence}%</span>
+                        <div className="w-12 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              confidence > 80 ? 'bg-green-500' : 
+                              confidence > 60 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${confidence}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      {formatPercentWithColor(coin.volumeChangePercent)}
+                    </td>
+                  </tr>
+                );
+              })}
+              
+              {/* Placeholder rows if needed */}
+              {predictedGainers.length < 5 && Array.from({ length: 5 - predictedGainers.length }).map((_, i) => (
+                <tr key={`placeholder-${i}`} className="border-b border-gray-700/30">
+                  <td className="px-2 py-2 text-gray-600">--</td>
+                  <td className="px-2 py-2 text-right text-gray-600">--</td>
+                  <td className="px-2 py-2 text-right text-gray-600">--</td>
+                  <td className="px-2 py-2 text-right text-gray-600">--</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Performance Table */}
+      {activeTab === 'performance' && (
+        <div className="overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="text-xs text-gray-400">
+                <th className="px-2 py-2 text-left">Coin</th>
+                <th className="px-2 py-2 text-right">Actual</th>
+                <th className="px-2 py-2 text-right">Predicted</th>
+                <th className="px-2 py-2 text-right">Accuracy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {actualGainers.map((coin, index) => {
+                // Find matching prediction if any
+                const matchingPrediction = predictedGainers.find(p => p.symbol === coin.symbol);
+                const predictedGain = matchingPrediction?.profitTarget || 0;
+                
+                // Calculate accuracy as % of how close prediction was to actual
+                let accuracy = 0;
+                if (predictedGain && coin.priceChangePercent) {
+                  accuracy = 100 - Math.min(100, Math.abs(
+                    ((predictedGain - coin.priceChangePercent) / coin.priceChangePercent) * 100
+                  ));
+                }
+                
+                return (
+                  <tr 
+                    key={coin.symbol}
+                    className={`border-b border-gray-700/30 ${index < 3 ? 'bg-green-900/10' : ''}`}
+                  >
+                    <td className="px-2 py-2">
+                      <div className="flex items-center">
+                        {index < 3 && (
+                          <span className="w-4 h-4 flex items-center justify-center mr-1 rounded-full bg-green-500 text-xs">
+                            {index + 1}
+                          </span>
+                        )}
+                        <span className="font-medium">{coin.baseAsset}</span>
+                        <span className="ml-1 text-xs text-gray-400">{coin.quoteAsset}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      {formatPercentWithColor(coin.priceChangePercent)}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      {predictedGain ? formatPercentWithColor(predictedGain) : <span className="text-gray-500">--</span>}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      {matchingPrediction ? (
+                        <div className="inline-flex items-center">
+                          <span className="mr-1">{Math.round(accuracy)}%</span>
+                          <div className="w-10 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${
+                                accuracy > 80 ? 'bg-green-500' : 
+                                accuracy > 50 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${accuracy}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">--</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              
+              {/* Placeholder rows if needed */}
+              {actualGainers.length < 5 && Array.from({ length: 5 - actualGainers.length }).map((_, i) => (
+                <tr key={`placeholder-${i}`} className="border-b border-gray-700/30">
+                  <td className="px-2 py-2 text-gray-600">--</td>
+                  <td className="px-2 py-2 text-right text-gray-600">--</td>
+                  <td className="px-2 py-2 text-right text-gray-600">--</td>
+                  <td className="px-2 py-2 text-right text-gray-600">--</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {/* Show a banner when viewing historical data for better context */}
+      {isHistoricalView && (
+        <div className="mt-3 text-xs text-purple-300 bg-purple-900/20 p-2 rounded">
+          <p>Viewing historical predictions from {new Date(historicalTimestamp).toLocaleString()}</p>
+          <p className="mt-1 text-gray-400">Note: Historical prediction accuracy may differ from current market conditions.</p>
         </div>
       )}
     </div>
