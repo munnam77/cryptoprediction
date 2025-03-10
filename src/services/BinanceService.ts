@@ -3,7 +3,7 @@
  * Provides functions to interact with the Binance API for real cryptocurrency data
  */
 import { API_CONFIG, WS_CONFIG, ENDPOINTS } from '../config/binance.config';
-import type { BinanceTicker, BinanceSymbolInfo, BinanceKline, MarketData } from '../types/binance';
+import type { BinanceTicker, BinanceSymbolInfo, BinanceKline, MarketData, TimeFrame } from '../types/binance';
 import BinanceWebSocketManager from './BinanceWebSocketManager';
 
 // Binance API base URL
@@ -18,154 +18,119 @@ const BINANCE_CONFIG = {
   BLACKLISTED_PAIRS: ['USDC', 'BUSD', 'TUSD', 'PAX', 'USDS', 'DAI']
 };
 
-// MOCK DATA GENERATOR - Use this when API is failing
-const generateMockData = () => {
-  // This ensures we don't get stuck in loading state when API fails
-  console.warn("Using mock data due to API failure");
+// Enhanced error handling and retry mechanism
+const fetchWithRetry = async (url: string, options = {}, maxRetries = 3): Promise<any> => {
+  let retries = 0;
   
-  // Generate mock pairs
-  const mockPairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'DOGEUSDT', 'SOLUSDT']
-    .map(symbol => {
-      const baseAsset = symbol.replace('USDT', '');
-      return {
-        symbol,
-        baseAsset,
-        quoteAsset: 'USDT',
-        status: 'TRADING',
-        isSpotTradingAllowed: true
-      } as BinanceSymbolInfo;
-    });
-  
-  // Generate mock tickers
-  const mockTickers = mockPairs.map(pair => {
-    const randomChange = (Math.random() * 10 - 5).toFixed(2); // -5% to +5%
-    const basePrice = {
-      'BTC': 50000 + Math.random() * 2000,
-      'ETH': 2500 + Math.random() * 200,
-      'BNB': 300 + Math.random() * 30,
-      'ADA': 0.5 + Math.random() * 0.1,
-      'XRP': 0.6 + Math.random() * 0.1,
-      'DOGE': 0.08 + Math.random() * 0.01,
-      'SOL': 100 + Math.random() * 10
-    }[pair.baseAsset] || 1.0;
-    
-    return {
-      symbol: pair.symbol,
-      priceChangePercent: randomChange,
-      lastPrice: basePrice.toString(),
-      highPrice: (basePrice * 1.05).toString(),
-      lowPrice: (basePrice * 0.95).toString(),
-      volume: (Math.random() * 10000000).toString(),
-      quoteVolume: (Math.random() * 50000000).toString(),
-      openPrice: (basePrice * 0.99).toString(),
-      bidPrice: (basePrice * 0.999).toString(),
-      askPrice: (basePrice * 1.001).toString()
-    } as BinanceTicker;
-  });
-  
-  // Generate mock klines
-  const generateMockKlines = (symbol: string, count: number = 20): BinanceKline[] => {
-    const klines: BinanceKline[] = [];
-    let basePrice = parseFloat(mockTickers.find(t => t.symbol === symbol)?.lastPrice || '100');
-    
-    const now = Date.now();
-    for (let i = 0; i < count; i++) {
-      const timeOffset = (count - i) * 3600000; // 1 hour per candle
-      basePrice = basePrice * (1 + (Math.random() * 0.04 - 0.02)); // +/- 2%
+  while (retries < maxRetries) {
+    try {
+      const response = await fetch(url, options);
       
-      const open = basePrice * (1 + (Math.random() * 0.02 - 0.01));
-      const close = basePrice * (1 + (Math.random() * 0.02 - 0.01));
-      const high = Math.max(open, close) * (1 + Math.random() * 0.01);
-      const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
       
-      klines.push({
-        openTime: now - timeOffset,
-        open: open.toString(),
-        high: high.toString(),
-        low: low.toString(),
-        close: close.toString(),
-        volume: (Math.random() * 1000).toString(),
-        closeTime: now - timeOffset + 3599999,
-        quoteAssetVolume: (Math.random() * 10000).toString(),
-        trades: Math.floor(Math.random() * 1000),
-        takerBuyBaseAssetVolume: (Math.random() * 500).toString(),
-        takerBuyQuoteAssetVolume: (Math.random() * 5000).toString()
+      return await response.json();
+    } catch (error) {
+      retries++;
+      console.warn(`API request failed (attempt ${retries}/${maxRetries}): ${error}`);
+      
+      if (retries >= maxRetries) {
+        throw new Error(`Maximum retries reached: ${error}`);
+      }
+      
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, BINANCE_CONFIG.RETRY_DELAY * Math.pow(2, retries - 1)));
+    }
+  }
+  
+  // This should never be reached due to the throw in the last retry
+  throw new Error("Failed to fetch after maximum retries");
+};
+
+// Rate limiting queue for API requests
+class RateLimiter {
+  private queue: Array<() => Promise<any>> = [];
+  private processing = false;
+  private requestsThisMinute = 0;
+  private resetTime = Date.now() + 60000;
+  
+  async add<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await fn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
       });
+      
+      if (!this.processing) {
+        this.processQueue();
+      }
+    });
+  }
+  
+  private async processQueue() {
+    if (this.queue.length === 0) {
+      this.processing = false;
+      return;
     }
     
-    return klines;
-  };
-  
-  return {
-    mockPairs,
-    mockTickers,
-    generateMockKlines
-  };
-};
+    this.processing = true;
+    
+    // Reset counter if minute has passed
+    if (Date.now() > this.resetTime) {
+      this.requestsThisMinute = 0;
+      this.resetTime = Date.now() + 60000;
+    }
+    
+    // Check if we've hit rate limit
+    if (this.requestsThisMinute >= BINANCE_CONFIG.MAX_REQUESTS_PER_MINUTE) {
+      const waitTime = this.resetTime - Date.now();
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      this.requestsThisMinute = 0;
+      this.resetTime = Date.now() + 60000;
+    }
+    
+    const nextRequest = this.queue.shift();
+    if (nextRequest) {
+      this.requestsThisMinute++;
+      await nextRequest();
+    }
+    
+    // Process next item in queue
+    this.processQueue();
+  }
+}
 
-// Rate limiting queue
-let requestCount = 0;
-let lastRequestTime = Date.now();
-const resetRequestCount = () => {
-  const now = Date.now();
-  if (now - lastRequestTime >= 60000) { // 1 minute
-    requestCount = 0;
-    lastRequestTime = now;
-  }
-};
-
-const checkRateLimit = async () => {
-  resetRequestCount();
-  if (requestCount >= BINANCE_CONFIG.MAX_REQUESTS_PER_MINUTE) {
-    const delay = 60000 - (Date.now() - lastRequestTime);
-    await new Promise(resolve => setTimeout(resolve, delay));
-    resetRequestCount();
-  }
-  requestCount++;
-};
-
-// Enhanced error handling with mock data fallback
-const handleApiError = async (error: any, fallbackValue: any = null, useMock = true) => {
-  console.error('API error:', error);
-  
-  if (useMock) {
-    // Return mock data instead of empty arrays so the UI isn't stuck
-    return fallbackValue;
-  }
-  
-  if (error.response?.status === 429) {
-    console.error('Rate limit exceeded:', error);
-    return new Promise(resolve => 
-      setTimeout(() => resolve(fallbackValue), BINANCE_CONFIG.RETRY_DELAY)
-    );
-  }
-  
-  return fallbackValue;
-};
+const rateLimiter = new RateLimiter();
 
 /**
  * Get all USDT trading pairs from Binance
  */
 export const getUSDTPairs = async (): Promise<BinanceSymbolInfo[]> => {
   try {
-    await checkRateLimit();
+    return await rateLimiter.add(async () => {
     const response = await fetch(`${BINANCE_API_BASE}/exchangeInfo`);
     if (!response.ok) {
-      throw new Error(`Network error: ${response.statusText}`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
     }
     
     const data = await response.json();
     
-    // Filter for active USDT pairs
+      // Filter for USDT pairs only
     return data.symbols.filter((symbol: BinanceSymbolInfo) => 
       symbol.quoteAsset === 'USDT' && 
       symbol.status === 'TRADING' &&
       symbol.isSpotTradingAllowed &&
       !BINANCE_CONFIG.BLACKLISTED_PAIRS.includes(symbol.baseAsset)
     );
+    });
   } catch (error) {
-    const mockData = generateMockData();
-    return await handleApiError(error, mockData.mockPairs);
+    console.error('API error:', error);
+    return [];
   }
 };
 
@@ -174,25 +139,23 @@ export const getUSDTPairs = async (): Promise<BinanceSymbolInfo[]> => {
  */
 export const get24hrTickers = async (symbol?: string): Promise<BinanceTicker[]> => {
   try {
-    await checkRateLimit();
+    return await rateLimiter.add(async () => {
     const url = symbol 
       ? `${BINANCE_API_BASE}/ticker/24hr?symbol=${symbol}` 
       : `${BINANCE_API_BASE}/ticker/24hr`;
     
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Network error: ${response.statusText}`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
     }
     
     const data = await response.json();
     
     return Array.isArray(data) ? data : [data];
+    });
   } catch (error) {
-    const mockData = generateMockData();
-    return await handleApiError(error, symbol ? 
-      [mockData.mockTickers.find(t => t.symbol === symbol) || mockData.mockTickers[0]] : 
-      mockData.mockTickers
-    );
+    console.error('API error:', error);
+    return [];
   }
 };
 
@@ -202,24 +165,23 @@ export const get24hrTickers = async (symbol?: string): Promise<BinanceTicker[]> 
  * @param interval Kline interval (e.g., "1h", "4h")
  * @param limit Number of klines to get
  */
-export const getKlines = async (
+export const getKlineData = async (
   symbol: string, 
-  interval: '15m' | '30m' | '1h' | '4h' | '1d', 
+  interval: string = '1h',
   limit: number = 100
 ): Promise<BinanceKline[]> => {
   try {
-    await checkRateLimit();
+    return await rateLimiter.add(async () => {
     const url = `${BINANCE_API_BASE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
     
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Network error: ${response.statusText}`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
     }
     
     const data = await response.json();
     
-    // Transform raw kline data to the expected format
-    return data.map((kline: any): BinanceKline => ({
+      return data.map((kline: any[]) => ({
       openTime: kline[0],
       open: kline[1],
       high: kline[2],
@@ -232,9 +194,10 @@ export const getKlines = async (
       takerBuyBaseAssetVolume: kline[9],
       takerBuyQuoteAssetVolume: kline[10]
     }));
+    });
   } catch (error) {
-    const mockData = generateMockData();
-    return await handleApiError(error, mockData.generateMockKlines(symbol, limit));
+    console.error('API error:', error);
+    return [];
   }
 };
 
@@ -244,22 +207,29 @@ export const getKlines = async (
  */
 export const getMarketCapData = async (coinIds: string[]): Promise<Record<string, number>> => {
   try {
-    await checkRateLimit();
+    return await rateLimiter.add(async () => {
     const ids = coinIds.join(',');
     const response = await fetch(
-      `${COINGECKO_API_BASE}/coins/markets?vs_currency=usd&ids=${ids}&per_page=250&page=1&sparkline=false`
+        `${COINGECKO_API_BASE}/coins/markets?vs_currency=usd&ids=${ids}&per_page=250`
     );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
     const data = await response.json();
     
-    // Create a map of coinId to market cap
+      // Create a map of coin id to market cap
     const marketCaps: Record<string, number> = {};
     data.forEach((coin: any) => {
-      marketCaps[coin.symbol.toUpperCase()] = coin.market_cap;
+        marketCaps[coin.symbol.toUpperCase()] = coin.market_cap || 0;
     });
     
     return marketCaps;
+    });
   } catch (error) {
-    return handleApiError(error, {});
+    console.error('API error:', error);
+    return {};
   }
 };
 
@@ -267,26 +237,16 @@ export const getMarketCapData = async (coinIds: string[]): Promise<Record<string
  * Calculate volatility from historical price data
  * @param klines Array of kline data
  */
-export const calculateVolatility = (klines: BinanceKline[]): number => {
-  if (klines.length < 2) return 0;
+export const calculateVolatility = (high: number, low: number, last: number): number => {
+  // Calculate volatility as the percentage range between high and low
+  // relative to the last price
+  if (last === 0) return 0;
   
-  // Calculate percent changes between closing prices
-  const changes: number[] = [];
-  for (let i = 1; i < klines.length; i++) {
-    const prevClose = parseFloat(klines[i-1].close);
-    const currClose = parseFloat(klines[i].close);
-    const change = ((currClose - prevClose) / prevClose) * 100;
-    changes.push(change);
-  }
+  const range = high - low;
+  const volatility = (range / last) * 100;
   
-  // Calculate standard deviation of price changes
-  const mean = changes.reduce((sum, value) => sum + value, 0) / changes.length;
-  const squaredDiffs = changes.map(value => Math.pow(value - mean, 2));
-  const variance = squaredDiffs.reduce((sum, value) => sum + value, 0) / squaredDiffs.length;
-  const stdDev = Math.sqrt(variance);
-  
-  // Normalize to a 0-100 scale (assuming max volatility around 10% stdDev)
-  return Math.min(100, Math.max(0, stdDev * 10));
+  // Scale to 0-100
+  return Math.min(100, Math.round(volatility * 5)); // Multiply by 5 to make it more visible
 };
 
 /**
@@ -294,19 +254,20 @@ export const calculateVolatility = (klines: BinanceKline[]): number => {
  * @param ticker Ticker data with volume
  * @param volume Volume normalized to 0-100 scale
  */
-export const calculateLiquidity = (ticker: BinanceTicker, volume: number): number => {
-  const bidPrice = parseFloat(ticker.bidPrice);
-  const askPrice = parseFloat(ticker.askPrice);
+export const calculateLiquidity = (volume: number): number => {
+  // Simple liquidity score based on volume
+  // Higher volume = higher liquidity (0-100 scale)
+  const MIN_VOLUME = 10000;  // $10K daily volume is very low
+  const MAX_VOLUME = 100000000;  // $100M daily volume is very high
   
-  // Calculate bid-ask spread as a percentage
-  const spread = (askPrice - bidPrice) / askPrice * 100;
+  if (volume <= MIN_VOLUME) return 0;
+  if (volume >= MAX_VOLUME) return 100;
   
-  // Invert spread (lower spread = higher liquidity)
-  // Normalize to 0-100 scale (assuming max acceptable spread is 2%)
-  const spreadScore = Math.min(100, Math.max(0, 100 - (spread * 50)));
+  // Log scale to better represent the range
+  const logVolume = Math.log(volume) - Math.log(MIN_VOLUME);
+  const logMaxVolume = Math.log(MAX_VOLUME) - Math.log(MIN_VOLUME);
   
-  // Combine volume and spread scores (weighted)
-  return spreadScore * 0.7 + volume * 0.3;
+  return Math.round((logVolume / logMaxVolume) * 100);
 };
 
 /**
@@ -473,49 +434,62 @@ export const calculatePumpProbability = (
   data: MarketData,
   timeframe: '15m' | '30m' | '1h' | '4h' | '1d'
 ): number => {
-  if (!data.historicalData || data.historicalData.length < 10) {
-    return 0;
+  // Base probability starts at 50%
+  let probability = 50;
+  
+  // Factor 1: Recent price change
+  if (data.priceChangePercent > 5) {
+    probability += 10; // Strong recent performance
+  } else if (data.priceChangePercent > 2) {
+    probability += 5; // Moderate recent performance
+  } else if (data.priceChangePercent < -5) {
+    probability -= 10; // Poor recent performance
+  } else if (data.priceChangePercent < -2) {
+    probability -= 5; // Moderate poor performance
   }
   
-  // Factors affecting pump probability
-  const volumeFactor = Math.min(100, data.volumeChangePercent * 2);
-  const volatilityFactor = data.volatility || 0;
-  const trendFactor = data.trend?.direction === 'up' ? data.trend.strength : 0;
-  const rsi = calculateRSI(data.historicalData);
-  const rsiBonus = rsi < 40 ? (40 - rsi) : 0; // Lower RSI means oversold, higher pump chance
+  // Factor 2: Volume change
+  if (data.volumeChangePercent > 100) {
+    probability += 15; // Massive volume increase
+  } else if (data.volumeChangePercent > 50) {
+    probability += 10; // Significant volume increase
+  } else if (data.volumeChangePercent > 20) {
+    probability += 5; // Moderate volume increase
+  } else if (data.volumeChangePercent < -50) {
+    probability -= 10; // Significant volume decrease
+  }
   
-  // Calculate base probability
-  let pumpProb = Math.max(0,
-    volumeFactor * 0.4 +
-    volatilityFactor * 0.3 + 
-    trendFactor * 0.2 +
-    rsiBonus
-  );
+  // Factor 3: Volatility
+  if (data.volatility > 70) {
+    probability += 10; // High volatility
+  } else if (data.volatility > 50) {
+    probability += 5; // Moderate volatility
+  } else if (data.volatility < 20) {
+    probability -= 5; // Low volatility
+  }
   
-  // Adjust based on timeframe
-  switch(timeframe) {
+  // Factor 4: Timeframe weight
+  // Shorter timeframes are more volatile and less predictable
+  switch (timeframe) {
     case '15m': 
-      // 15m is more volatile/unpredictable
-      pumpProb = pumpProb * 0.8 + Math.random() * 20;
+      probability = probability * 0.8 + 10; // Less reliable, bias toward 50%
       break;
     case '30m':
-      // 30m is slightly more predictable
-      pumpProb = pumpProb * 0.85 + Math.random() * 15;
+      probability = probability * 0.85 + 7.5; // Slightly more reliable
       break;
     case '1h':
-      // 1h is moderate
-      pumpProb = pumpProb * 0.9 + Math.random() * 10;
+      probability = probability * 0.9 + 5; // More reliable
       break;
     case '4h':
-      // 4h is more reliable
-      pumpProb = pumpProb * 0.95 + Math.random() * 5;
+      probability = probability * 0.95 + 2.5; // More reliable
       break;
     case '1d':
-      // 1d is most reliable
+      // No adjustment for daily timeframe
       break;
   }
   
-  return Math.min(100, Math.max(0, Math.round(pumpProb)));
+  // Ensure probability is within 0-100 range
+  return Math.max(0, Math.min(100, probability));
 };
 
 /**
@@ -589,248 +563,64 @@ export const detectBreakouts = (
  * Get comprehensive market data for all USDT pairs
  * @param timeframe Timeframe for historical data
  */
-export const getComprehensiveMarketData = async (
-  timeframe: '15m' | '30m' | '1h' | '4h' | '1d' = '1h'
-): Promise<MarketData[]> => {
+export const getComprehensiveMarketData = async (timeframe: string = '1d'): Promise<MarketData[]> => {
   try {
-    // Step 1: Get all initial data in parallel
-    const [usdtPairs, tickers, btcKlines] = await Promise.all([
-      getUSDTPairs().catch(err => {
-        console.error('Failed to fetch USDT pairs:', err);
-        return [];
-      }),
-      get24hrTickers().catch(err => {
-        console.error('Failed to fetch 24hr tickers:', err);
-        return [];
-      }),
-      getKlines('BTCUSDT', timeframe, 20).catch(err => {
-        console.error('Failed to fetch BTC klines:', err);
-        return [];
-      })
-    ]);
+    // Get all USDT trading pairs
+    const pairs = await getUSDTPairs();
     
-    // If no data was returned, throw an error which will trigger mock data generation
-    if (!usdtPairs.length || !tickers.length || !btcKlines.length) {
-      console.warn('Missing essential market data, using mock data instead');
-      throw new Error('Failed to fetch necessary market data');
-    }
+    // Get 24hr ticker data for all pairs
+    const tickers = await get24hrTickers();
     
-    // Filter for tickers that match our USDT pairs - limit to 50 pairs to improve performance
-    const filteredTickers = tickers
-      .filter(ticker => 
-        usdtPairs.some(pair => pair.symbol === ticker.symbol)
-      )
-      .slice(0, 50); // Get top 50 to ensure we have enough data
-    
-    // Calculate max volume once
-    const maxVolume = Math.max(...filteredTickers.map(ticker => parseFloat(ticker.quoteVolume)));
-
-    // Step 2: Fetch historical data for all pairs in parallel batches
-    const batchSize = 5; // Process 5 pairs at a time to avoid rate limits
-    const batches = [];
-    
-    for (let i = 0; i < filteredTickers.length; i += batchSize) {
-      const batch = filteredTickers.slice(i, i + batchSize);
-      batches.push(batch);
-    }
-
-    const marketData: MarketData[] = [];
-    
-    // Process batches sequentially to respect rate limits
-    for (const batch of batches) {
-      const batchPromises = batch.map(async ticker => {
-        try {
-          // Find corresponding pair info
-          const pairInfo = usdtPairs.find(pair => pair.symbol === ticker.symbol);
-          if (!pairInfo) return null;
-          
-          // Get historical data
-          const klines = await getKlines(ticker.symbol, timeframe, 20)
-            .catch(err => {
-              console.error(`Failed to fetch klines for ${ticker.symbol}:`, err);
-              return []; // Return empty array instead of failing
-            });
-          
-          // Skip if no klines data
-          if (!klines.length) return null;
-          
-          // Handle price formatting issues
-          const price = parseFloat(ticker.lastPrice) || 0;
-          const priceChange = parseFloat(ticker.priceChangePercent) || 0;
-          const volume = parseFloat(ticker.quoteVolume) || 0;
-
-          // Calculate all metrics for this pair
-          const volatility = calculateVolatility(klines);
-          const volumeChangePercent = calculateVolumeChange(klines);
-          const normalizedVolume = Math.min(100, (volume / maxVolume) * 100);
-          const liquidity = calculateLiquidity(ticker, normalizedVolume);
-          const rsi = calculateRSI(klines);
-          const btcCorrelation = calculateCorrelation(klines, btcKlines);
-          const {velocity, trend} = calculatePriceVelocity(klines);
-          const trendDetails = calculateTrendDetails(ticker);
-          
-          // Calculate basic indicators
-          const pumpProbability = Math.min(100, Math.max(0, (volatility * 0.3) + (priceChange * 2) + (volumeChangePercent * 0.3) + 40));
-          const profitTarget = Math.max(1, Math.min(20, priceChange * 1.2 + 3));
-          const breakout = detectBreakouts(klines, price);
-          
-          // Return market data entry with all required properties
+    // Map ticker data to trading pairs
+    const marketData: MarketData[] = pairs.map(pair => {
+      const ticker = tickers.find((t: BinanceTicker) => t.symbol === pair.symbol);
+      
+      if (!ticker) {
           return {
-            symbol: ticker.symbol,
-            baseAsset: pairInfo.baseAsset,
-            quoteAsset: pairInfo.quoteAsset,
-            price,
-            priceChangePercent: priceChange,
-            volume,
-            volumeChangePercent,
-            historicalData: klines.slice(-5), // Keep only the last 5 items to reduce size
-            volatility,
-            liquidity,
-            rsi,
-            btcCorrelation,
-            priceVelocity: velocity,
-            priceVelocityTrend: trend,
-            pumpProbability,
-            profitTarget,
-            breakout,
-            trend: trendDetails,
-            pivotPoint: {
-              price: (parseFloat(ticker.highPrice) + parseFloat(ticker.lowPrice)) / 2,
-              type: parseFloat(ticker.priceChangePercent) > 0 ? 'support' as const : 'resistance' as const,
-              strength: Math.abs(parseFloat(ticker.priceChangePercent)) * 10
-            },
-            orderBookImbalance: 50 + (parseFloat(ticker.priceChangePercent) * 2),
-            tradingZones: [
-              { price: parseFloat(ticker.lowPrice), intensity: 70 },
-              { price: parseFloat(ticker.highPrice), intensity: 60 }
-            ],
-            consecutiveGains: calculateConsecutiveGains(klines),
-            // Add missing fields that components might be expecting
-            sellPressure: Math.random() * 100,
-            buyPressure: Math.random() * 100,
-            baseAssetVolume: parseFloat(ticker.volume) || 0,
-            // Add additional fields for enhanced UI
-            whaleActivity: {
-              buyPressure: Math.random() * 100,
-              sellPressure: Math.random() * 100,
-              lastTransaction: {
-                amount: Math.random() * 1000000,
-                type: Math.random() > 0.5 ? 'buy' as const : 'sell' as const,
-                time: Date.now() - Math.random() * 3600000
-              }
-            },
-            gemScore: Math.random() * 100,
-            marketCap: Math.random() * 500000000,
-            riskScore: Math.random() * 100,
-            volatilityTrend: ['increasing', 'stable', 'decreasing'][Math.floor(Math.random() * 3)] as 'increasing' | 'stable' | 'decreasing',
-            momentum: (Math.random() * 200) - 100,
-            sentiment: Math.random() * 100,
-            signalStrength: Math.random() * 100,
-            signalDirection: ['buy', 'sell', 'neutral'][Math.floor(Math.random() * 3)] as 'buy' | 'sell' | 'neutral'
-          };
-        } catch (error) {
-          console.error(`Error processing ${ticker.symbol}:`, error);
-          return null;
-        }
-      });
-
-      try {
-        const batchResults = await Promise.all(batchPromises);
-        marketData.push(...batchResults.filter((data): data is NonNullable<typeof data> => data !== null));
-      } catch (error) {
-        console.error("Error processing batch:", error);
-        // Continue with next batch instead of failing completely
+          symbol: pair.symbol,
+          baseAsset: pair.baseAsset,
+          quoteAsset: pair.quoteAsset,
+          price: 0,
+          priceChangePercent: 0,
+          volume: 0,
+          volumeChangePercent: 0,
+          high24h: 0,
+          low24h: 0,
+          marketCap: 0,
+          liquidity: 50,
+          volatility: 50,
+          prediction: 'neutral',
+          confidence: 0
+        };
       }
       
-      // Add a small delay between batches to avoid rate limits
-      if (batches.indexOf(batch) < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
-    
-    // If we somehow ended up with no market data, throw error to trigger mock data
-    if (marketData.length === 0) {
-      console.warn('No market data was successfully processed, using mock data');
-      throw new Error('No market data was successfully processed');
-    }
-    
-    // Sort by volume (descending)
-    return marketData.sort((a, b) => b.volume - a.volume);
-  } catch (error) {
-    console.error("Failed to get market data, using mock data instead:", error);
-    
-    // Generate mock market data so the UI isn't stuck
-    const mockData = generateMockData();
-    const mockMarketData: MarketData[] = [];
-    
-    for (const pair of mockData.mockPairs) {
-      const ticker = mockData.mockTickers.find(t => t.symbol === pair.symbol);
-      if (!ticker) continue;
-      
-      const klines = mockData.generateMockKlines(pair.symbol, 20);
-      const price = parseFloat(ticker.lastPrice);
-      const priceChange = parseFloat(ticker.priceChangePercent);
-      
-      // Create mock data with all required properties
-      mockMarketData.push({
+      return {
         symbol: pair.symbol,
         baseAsset: pair.baseAsset,
         quoteAsset: pair.quoteAsset,
-        price: price,
-        priceChangePercent: priceChange,
-        volume: parseFloat(ticker.quoteVolume),
-        volumeChangePercent: (Math.random() * 20) - 10,
-        historicalData: klines.slice(-5),
-        volatility: Math.random() * 80,
-        liquidity: Math.random() * 90 + 10,
-        rsi: Math.random() * 100,
-        btcCorrelation: (Math.random() * 200) - 100,
-        priceVelocity: (Math.random() * 10) - 5,
-        priceVelocityTrend: Math.random() > 0.5 ? 'accelerating' : 'decelerating',
-        pumpProbability: Math.random() * 100,
-        profitTarget: Math.random() * 20,
-        trend: {
-          direction: Math.random() > 0.5 ? 'up' : 'down',
-          strength: Math.random() * 100,
-          duration: Math.floor(Math.random() * 24)
-        },
-        pivotPoint: {
-          price: price * (1 + (Math.random() * 0.1 - 0.05)),
-          type: Math.random() > 0.5 ? 'resistance' as const : 'support' as const,
-          strength: Math.random() * 100
-        },
-        orderBookImbalance: Math.random() * 100,
-        tradingZones: [
-          { price: price * 0.95, intensity: Math.random() * 100 },
-          { price: price * 1.05, intensity: Math.random() * 100 }
-        ],
-        consecutiveGains: Math.floor(Math.random() * 6),
-        // Add missing fields that components might be expecting
-        sellPressure: Math.random() * 100,
-        buyPressure: Math.random() * 100,
-        baseAssetVolume: Math.random() * 1000000,
-        // Add additional fields for enhanced UI
-        whaleActivity: {
-          buyPressure: Math.random() * 100,
-          sellPressure: Math.random() * 100,
-          lastTransaction: {
-            amount: Math.random() * 1000000,
-            type: Math.random() > 0.5 ? 'buy' as const : 'sell' as const,
-            time: Date.now() - Math.random() * 3600000
-          }
-        },
-        gemScore: Math.random() * 100,
-        marketCap: Math.random() * 500000000,
-        riskScore: Math.random() * 100,
-        volatilityTrend: ['increasing', 'stable', 'decreasing'][Math.floor(Math.random() * 3)] as 'increasing' | 'stable' | 'decreasing',
-        momentum: (Math.random() * 200) - 100,
-        sentiment: Math.random() * 100,
-        signalStrength: Math.random() * 100,
-        signalDirection: ['buy', 'sell', 'neutral'][Math.floor(Math.random() * 3)] as 'buy' | 'sell' | 'neutral'
-      });
-    }
+        price: parseFloat(ticker.lastPrice),
+        priceChangePercent: parseFloat(ticker.priceChangePercent),
+        volume: parseFloat(ticker.volume),
+        volumeChangePercent: 0, // Will be calculated later
+        high24h: parseFloat(ticker.highPrice),
+        low24h: parseFloat(ticker.lowPrice),
+        marketCap: 0, // Will be filled in later
+        liquidity: calculateLiquidity(parseFloat(ticker.volume)),
+        volatility: calculateVolatility(
+          parseFloat(ticker.highPrice),
+          parseFloat(ticker.lowPrice),
+          parseFloat(ticker.lastPrice)
+        ),
+        prediction: 'neutral',
+        confidence: 0
+      };
+    });
     
-    return mockMarketData;
+    // Filter out any pairs with zero price or volume
+    return marketData.filter(data => data.price > 0 && data.volume > 0);
+  } catch (error) {
+    console.error('Error fetching comprehensive market data:', error);
+    return [];
   }
 };
 
@@ -890,45 +680,57 @@ export const getTopGainers = async (
 /**
  * Get low-cap gems based on volatility and recent performance
  * @param timeframe Timeframe for historical data
+ * @param minMarketCap Minimum market cap for filtering
+ * @param maxMarketCap Maximum market cap for filtering
  * @param limit Maximum number of results
  */
 export const getLowCapGems = async (
-  timeframe: '15m' | '30m' | '1h' | '4h' | '1d' = '1h',
+  timeframe: string = '1d',
+  minMarketCap: number = 10000000, // $10M
+  maxMarketCap: number = 500000000, // $500M
   limit: number = 10
 ): Promise<MarketData[]> => {
-  const marketData = await getComprehensiveMarketData(timeframe);
-  
-  // Calculate a combined score for each coin
-  const scoredData = marketData.map(data => {
-    // Prioritize coins with:
-    // - Higher volatility
-    // - Positive price change
-    // - Lower volume (as proxy for lower market cap)
-    // - Higher volume change (indicating growing interest)
+  try {
+    const allMarketData = await getComprehensiveMarketData(timeframe);
     
-    const volatilityScore = data.volatility || 0;
-    const priceChangeScore = Math.max(0, data.priceChangePercent * 2);
-    const volumeScore = Math.max(0, data.volumeChangePercent);
+    // Get market cap data for all pairs
+    const baseAssets = allMarketData.map(data => data.baseAsset.toLowerCase());
+    const marketCapData = await getMarketCapData(baseAssets);
     
-    // Volume is inverted - we want lower volume coins
-    const volumePenalty = Math.min(50, (data.volume / 1000000));
-    
-    const totalScore = 
-      (volatilityScore * 0.4) + 
-      (priceChangeScore * 0.3) + 
-      (volumeScore * 0.3) - 
-      volumePenalty;
-    
+    // Add market cap data to market data
+    const withMarketCap = allMarketData.map(data => {
+      const marketCap = marketCapData[data.baseAsset.toUpperCase()] || 0;
     return {
       ...data,
-      gemScore: totalScore
+        marketCap
     };
   });
   
-  // Sort by total score (descending)
-  return scoredData
-    .sort((a, b) => (b.gemScore || 0) - (a.gemScore || 0))
-    .slice(0, limit);
+    // Filter by market cap range
+    const filteredByMarketCap = withMarketCap.filter(
+      data => data.marketCap >= minMarketCap && data.marketCap <= maxMarketCap
+    );
+    
+    // Sort by potential (combination of volatility, volume change, and price change)
+    const sorted = [...filteredByMarketCap].sort((a, b) => {
+      const aVolatility = a.volatility || 0;
+      const bVolatility = b.volatility || 0;
+      const aVolumeChange = a.volumeChangePercent || 0;
+      const bVolumeChange = b.volumeChangePercent || 0;
+      const aPriceChange = a.priceChangePercent || 0;
+      const bPriceChange = b.priceChangePercent || 0;
+      
+      const aPotential = (aVolatility * 0.4) + (Math.abs(aVolumeChange) * 0.3) + (Math.abs(aPriceChange) * 0.3);
+      const bPotential = (bVolatility * 0.4) + (Math.abs(bVolumeChange) * 0.3) + (Math.abs(bPriceChange) * 0.3);
+      return bPotential - aPotential;
+    });
+    
+    // Return top N low cap gems
+    return sorted.slice(0, limit);
+  } catch (error) {
+    console.error('Error getting low cap gems:', error);
+    return [];
+  }
 };
 
 /**
@@ -998,12 +800,13 @@ export const getMarketMood = async (): Promise<{
       volatility: normalizedVolatility
     };
   } catch (error) {
-    return handleApiError(error, {
+    console.error('API error:', error);
+    return {
       sentiment: 50,  // Neutral fallback
       btcChangePercent: 0,
       marketChangePercent: 0,
       volatility: 30
-    });
+    };
   }
 };
 
@@ -1017,123 +820,83 @@ export const subscribeToMarketData = (
   symbols: string[],
   onUpdate: (data: MarketData[]) => void
 ): void => {
-  // Use the correct method - subscribeToTickerUpdates instead of subscribeToDayTicker
+  // Use the WebSocket manager to subscribe to ticker updates
   const wsManager = BinanceWebSocketManager.getInstance();
-  wsManager.subscribeToTickerUpdates(symbols, async (tickerData: MarketData[]) => {
-    try {
-      // Process the data as before, but ensure we're working with the correct data format
-      // Convert to array if it's a single item
-      const dataArray = Array.isArray(tickerData) ? tickerData : [tickerData];
+  
+  // Create a buffer to collect updates
+  const dataBuffer: any[] = [];
+  let bufferTimer: NodeJS.Timeout | null = null;
+  
+  wsManager.subscribeToTickerUpdates(symbols, (tickerData: any) => {
+    // Add the data to the buffer
+    dataBuffer.push(tickerData);
+    
+    // If we have a timer already, clear it
+    if (bufferTimer) {
+      clearTimeout(bufferTimer);
+    }
+    
+    // Set a new timer to process the buffer after a short delay
+    // This helps batch updates together for better performance
+    bufferTimer = setTimeout(() => {
+      if (dataBuffer.length === 0) return;
       
-      const marketDataPromises = dataArray.map(async (ticker: any) => {
-        // Get historical klines for additional calculations
-        const symbol = ticker.s || ticker.symbol;
-        if (!symbol) {
-          console.error("Invalid ticker data received:", ticker);
-          return null;
-        }
-        
-        const klines = await getKlines(symbol, '1h', 20);
-        
-        // Calculate derived metrics
-        const volatility = calculateVolatility(klines);
-        const volume = parseFloat(ticker.q || ticker.volume || '0');
-        const volumeChange = 0; // This would need proper calculation
+      try {
+        // Convert ticker data to MarketData format
+        const marketData: MarketData[] = dataBuffer.map(ticker => {
+          const symbol = ticker.s;
+          const baseAsset = symbol.replace('USDT', '');
+          const quoteAsset = 'USDT';
         
         return {
-          symbol: symbol,
-          baseAsset: symbol.replace('USDT', ''),
-          quoteAsset: 'USDT',
-          price: parseFloat(ticker.c || ticker.price || '0'),
-          priceChangePercent: parseFloat(ticker.P || ticker.priceChangePercent || '0'),
-          volume,
-          volumeChangePercent: volumeChange,
-          historicalData: klines.slice(-5), // Keep only the last 5 items
-          volatility,
-          liquidity: 50, // Default value - would need proper calculation
-          rsi: calculateRSI(klines),
-          btcCorrelation: calculateCorrelation(klines, []), // Use calculateCorrelation instead
-          priceVelocity: 0, // Default value
-          priceVelocityTrend: 'stable' as const
-        } as MarketData;
-      });
-      
-      // Filter out any null values from failed conversions
-      const marketDataResults = await Promise.all(marketDataPromises);
-      const marketData = marketDataResults.filter((data): data is MarketData => data !== null);
-      
-      if (marketData.length > 0) {
+            symbol,
+            baseAsset,
+            quoteAsset,
+            price: parseFloat(ticker.c),
+            priceChangePercent: parseFloat(ticker.P),
+            volume: parseFloat(ticker.v),
+            volumeChangePercent: 0, // Real-time data doesn't include this
+            high24h: parseFloat(ticker.h),
+            low24h: parseFloat(ticker.l),
+            marketCap: 0, // Real-time data doesn't include this
+            liquidity: calculateLiquidity(parseFloat(ticker.v)),
+            volatility: calculateVolatility(
+              parseFloat(ticker.h),
+              parseFloat(ticker.l),
+              parseFloat(ticker.c)
+            ),
+            prediction: 'neutral',
+            confidence: 0
+          };
+        });
+        
+        // Clear the buffer
+        dataBuffer.length = 0;
+        
+        // Notify the callback
         onUpdate(marketData);
-      } else {
-        // If all conversions failed, provide mock data
-        const mockData = generateMockData();
-        const mockMarketData = createMockMarketData(mockData);
-        onUpdate(mockMarketData);
-      }
     } catch (error) {
       console.error("Error processing real-time market data:", error);
-      
-      // Return mock data so UI isn't stuck
-      const mockData = generateMockData();
-      const mockMarketData = createMockMarketData(mockData);
-      onUpdate(mockMarketData);
-    }
-  });
-};
-
-// Helper function to create mock market data
-const createMockMarketData = (mockData: any): MarketData[] => {
-  return mockData.mockPairs.slice(0, 5).map((pair: any) => {
-    const ticker = mockData.mockTickers.find((t: any) => t.symbol === pair.symbol);
-    if (!ticker) return null;
-    
-    const klines = mockData.generateMockKlines(pair.symbol, 20);
-    return {
-      symbol: pair.symbol,
-      baseAsset: pair.baseAsset,
-      quoteAsset: pair.quoteAsset,
-      price: parseFloat(ticker.lastPrice),
-      priceChangePercent: parseFloat(ticker.priceChangePercent),
-      volume: parseFloat(ticker.quoteVolume),
-      volumeChangePercent: (Math.random() * 20) - 10,
-      historicalData: klines.slice(-5),
-      volatility: Math.random() * 80,
-      liquidity: Math.random() * 90 + 10,
-      rsi: Math.random() * 100,
-      btcCorrelation: (Math.random() * 200) - 100,
-      priceVelocity: (Math.random() * 10) - 5,
-      priceVelocityTrend: 'stable' as const,
-      sellPressure: Math.random() * 100,
-      buyPressure: Math.random() * 100,
-      baseAssetVolume: Math.random() * 1000000,
-      // Add additional fields for enhanced UI
-      whaleActivity: {
-        buyPressure: Math.random() * 100,
-        sellPressure: Math.random() * 100,
-        lastTransaction: {
-          amount: Math.random() * 1000000,
-          type: Math.random() > 0.5 ? 'buy' as const : 'sell' as const,
-          time: Date.now() - Math.random() * 3600000
-        }
+        // Return empty array on error
+        onUpdate([]);
       }
-    } as MarketData;
-  }).filter((item: any): item is NonNullable<typeof item> => item !== null);
+    }, 100); // 100ms delay to batch updates
+  });
 };
 
 /**
  * Unsubscribe from market data updates
  */
 export const unsubscribeFromMarketData = (): void => {
-  // Use the correct unsubscribe method from the instance
   const wsManager = BinanceWebSocketManager.getInstance();
-  wsManager.unsubscribeFromTickerUpdates();
+  wsManager.unsubscribeAll();
 };
 
 // Export the entire service
 const BinanceService = {
   getUSDTPairs,
   get24hrTickers,
-  getKlines,
+  getKlineData,
   getMarketCapData,
   calculateVolatility,
   calculateLiquidity,

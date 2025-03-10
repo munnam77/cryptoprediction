@@ -4,7 +4,7 @@ import { useMarketData } from '../hooks/useMarketData';
 import MainLayout from './MainLayout';
 import DynamicBackgroundShift from './DynamicBackgroundShift';
 import TopNavigationBar from './TopNavigationBar';
-import type { MarketData } from '../types/binance';
+import type { MarketData, TimeFrame } from '../types/binance';
 import { AlertCircle, RefreshCw, Zap } from 'lucide-react';
 
 const AppContainer: React.FC = () => {
@@ -19,7 +19,7 @@ const AppContainer: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Feature detection state
-  const [availableFeatures, _setAvailableFeatures] = useState({
+  const [availableFeatures, setAvailableFeatures] = useState({
     marketData: true,
     predictions: true,
     topGainers: true,
@@ -33,7 +33,7 @@ const AppContainer: React.FC = () => {
     volatility: 0,
     marketChange: 0,
     btcChangePercent: 0,
-    selectedTimeframe: '1h' as '15m' | '30m' | '1h' | '4h' | '1d'
+    selectedTimeframe: '1h' as TimeFrame
   });
 
   const [debugMode, setDebugMode] = useState(false);
@@ -41,6 +41,7 @@ const AppContainer: React.FC = () => {
   const [dataInitialized, setDataInitialized] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [appReady, setAppReady] = useState(false);
   const MAX_RETRIES = 3;
 
   // Use our custom hook for real-time market data with progressive loading
@@ -195,12 +196,32 @@ const AppContainer: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [debugMode]);
 
-  // Handle timeframe change
-  const handleTimeframeChange = (timeframe: '15m' | '30m' | '1h' | '4h' | '1d') => {
+  // Add a timeframe change handler with better visual feedback
+  const handleTimeframeChange = (timeframe: TimeFrame) => {
+    // Log the timeframe change
+    console.log(`Changing timeframe from ${marketState.selectedTimeframe} to ${timeframe}`);
+    
+    // Show a loading state during timeframe change
+    setRefreshing(true);
+    
+    // Update the market state with the new timeframe
     setMarketState(prev => ({
       ...prev,
       selectedTimeframe: timeframe
     }));
+    
+    // Refresh the market data with the new timeframe
+    refreshMarketData([...initialSymbols])
+      .then(() => {
+        // Wait a moment to show the loading animation
+        setTimeout(() => {
+          setRefreshing(false);
+        }, 500);
+      })
+      .catch(error => {
+        console.error('Error refreshing data after timeframe change:', error);
+        setRefreshing(false);
+      });
   };
 
   // Handle manual refresh
@@ -228,6 +249,17 @@ const AppContainer: React.FC = () => {
     }
   }, [marketDataError, debugMode]);
 
+  // Set app ready state after initial loading
+  useEffect(() => {
+    if (!isLoading && !isMarketDataLoading && allMarketData.length > 0) {
+      // Add a small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setAppReady(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isMarketDataLoading, allMarketData]);
+
   return (
     <div className="min-h-screen relative">
       <DynamicBackgroundShift
@@ -243,100 +275,103 @@ const AppContainer: React.FC = () => {
 
       {/* Debug Panel */}
       {debugMode && (
-        <div className="fixed top-16 right-4 z-50 glass-effect text-white p-4 rounded-lg text-sm shadow-lg animate-slide-in-right">
+        <div className="fixed top-16 right-4 z-50 glass-panel text-white p-4 rounded-lg text-sm shadow-lg animate-slide-in-right">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-medium">Debug Mode</h3>
             <div className="px-2 py-0.5 bg-indigo-600 rounded-full text-xs">Active</div>
           </div>
-          <div className="space-y-1">
-            <p>Market Sentiment: {marketState.sentiment.toFixed(2)}</p>
-            <p>Volatility: {marketState.volatility.toFixed(2)}</p>
-            <p>BTC Change: {marketState.btcChangePercent.toFixed(2)}%</p>
-            <p>Data Points: {allMarketData.length}</p>
+          <div className="space-y-2">
+            <div>
+              <div className="text-xs text-gray-400">Market Data Status:</div>
+              <div className={`text-sm ${marketDataError ? 'text-red-400' : 'text-green-400'}`}>
+                {marketDataError ? 'Error' : 'OK'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400">Loaded Pairs:</div>
+              <div className="text-sm">{allMarketData.length}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400">Selected Timeframe:</div>
+              <div className="text-sm">{marketState.selectedTimeframe}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400">Top Gainers:</div>
+              <div className="text-sm">{topGainers.length}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400">Low Cap Gems:</div>
+              <div className="text-sm">{lowCapGems.length}</div>
+            </div>
+            <button
+              onClick={handleManualRefresh}
+              disabled={refreshing}
+              className="w-full mt-2 flex items-center justify-center px-3 py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-white text-sm transition-colors duration-200"
+            >
+              {refreshing ? (
+                <>
+                  <RefreshCw size={14} className="mr-1 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={14} className="mr-1" />
+                  Refresh Data
+                </>
+              )}
+            </button>
           </div>
-          
-          <div className="mt-3 border-t border-gray-700 pt-2">
-            <h4 className="text-xs text-gray-400 uppercase mb-1">Errors</h4>
-            {Object.entries(errors).map(([key, error]) => 
-              error ? <p key={key} className="text-red-400 text-xs">{error}</p> : null
-            )}
-          </div>
-          
-          <div className="mt-3 border-t border-gray-700 pt-2">
-            <h4 className="text-xs text-gray-400 uppercase mb-1">Loading States</h4>
-            {Object.entries(loadingStates).map(([key, loading]) => 
-              <p key={key} className={`text-xs ${loading ? 'text-yellow-400' : 'text-green-400'}`}>
-                {key}: {loading ? 'Loading...' : 'Ready'}
-              </p>
-            )}
-          </div>
-          
-          <button 
-            className="mt-3 w-full bg-gray-700 hover:bg-gray-600 text-white py-1 rounded text-xs transition-colors"
-            onClick={handleManualRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? 'Refreshing...' : 'Refresh Data'}
-          </button>
         </div>
       )}
 
-      <MainLayout 
-        marketSentiment={marketState.sentiment}
-        marketVolatility={marketState.volatility}
-        btcChangePercent={marketState.btcChangePercent}
-        marketChangePercent={marketState.marketChange}
-        selectedTimeframe={marketState.selectedTimeframe}
-        onTimeframeChange={handleTimeframeChange}
-        topGainers={topGainers}
-        lowCapGems={lowCapGems}
-        allMarketData={allMarketData}
-        isLoading={isLoading}
-        availableFeatures={availableFeatures}
-      />
+      {/* Main Content */}
+      <div className={`transition-opacity duration-500 ${appReady ? 'opacity-100' : 'opacity-0'}`}>
+        <MainLayout
+          selectedTimeframe={marketState.selectedTimeframe}
+          onTimeframeChange={handleTimeframeChange}
+          topGainers={topGainers}
+          lowCapGems={lowCapGems}
+          allMarketData={allMarketData}
+          isLoading={isLoading || isMarketDataLoading}
+          marketSentiment={marketState.sentiment}
+          marketVolatility={marketState.volatility}
+          btcChangePercent={marketState.btcChangePercent}
+          marketChangePercent={marketState.marketChange}
+          availableFeatures={availableFeatures}
+        />
+      </div>
       
-      {/* Refresh Button */}
-      <button
-        onClick={handleManualRefresh}
-        disabled={refreshing}
-        className="fixed bottom-4 left-4 z-50 bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110"
-        title="Refresh data"
-      >
-        <RefreshCw size={20} className={`${refreshing ? 'animate-spin' : ''}`} />
-      </button>
-      
-      {/* Errors Toast */}
-      {Object.values(errors).some(error => error) && !debugMode && (
-        <div className="fixed bottom-4 right-4 z-50 glass-effect text-white px-4 py-3 rounded-lg shadow-lg animate-slide-in-bottom">
-          <div className="flex items-center">
-            <AlertCircle size={18} className="text-red-400 mr-2" />
-            <div>
-              <p className="font-medium">Some features may be unavailable</p>
-              <p className="text-sm mt-0.5 text-gray-300">Check your connection and refresh the page</p>
+      {/* Initial Loading Screen */}
+      {!appReady && (
+        <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+          <div className="relative w-24 h-24 mb-8">
+            <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+            <div className="absolute inset-0 rounded-full border-t-4 border-indigo-500 animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Zap size={32} className="text-indigo-400" />
             </div>
           </div>
-        </div>
-      )}
-      
-      {/* Loading Overlay - Only show for initial load */}
-      {isLoading && (
-        <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-          <div className="glass-effect rounded-lg p-8 shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-center mb-6">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                <Zap size={20} className="text-indigo-400 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+          <h2 className="text-2xl font-bold mb-2 gradient-text">CryptoPrediction</h2>
+          <p className="text-gray-400 mb-6">Loading market data...</p>
+          <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-pulse-slow"
+              style={{ width: `${Math.min(100, allMarketData.length * 2)}%` }}
+            ></div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            {allMarketData.length > 0 ? `Loaded ${allMarketData.length} pairs` : 'Connecting to market...'}
+          </div>
+          
+          {/* Error Messages */}
+          {Object.entries(errors).map(([key, error]) => 
+            error ? (
+              <div key={key} className="mt-4 flex items-center text-red-400 text-sm">
+                <AlertCircle size={16} className="mr-2" />
+                {error}
               </div>
-            </div>
-            <h3 className="text-xl font-medium text-white text-center mb-2">Loading Market Data</h3>
-            <p className="text-center text-gray-300 mb-4">Fetching real-time cryptocurrency data...</p>
-            <div className="w-full bg-gray-700 rounded-full h-1.5">
-              <div className="bg-indigo-600 h-1.5 rounded-full bg-shimmer" style={{ width: '60%' }}></div>
-            </div>
-            <div className="mt-4 text-center text-sm text-gray-400">
-              This may take a moment depending on your connection
-            </div>
-          </div>
+            ) : null
+          )}
         </div>
       )}
     </div>

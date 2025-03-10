@@ -1,63 +1,56 @@
-import React from 'react';
-import { RefreshCw } from 'lucide-react';
-
-interface RefreshProgressBarProps {
-  progress: number; // 0-100
-  onRefresh?: () => void;
-  className?: string;
-}
+import React, { useState, useEffect } from 'react';
 
 /**
  * RefreshProgressBar Component
- * Shows a progress bar for the 30-second refresh cycle
+ * 
+ * Displays a progress bar that shows the time until the next data refresh
  */
-const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
-  progress,
-  onRefresh,
-  className = ''
-}) => {
-  // Normalize progress to ensure it's between 0-100
-  const normalizedProgress = Math.min(100, Math.max(0, progress));
+const RefreshProgressBar: React.FC = () => {
+  const [progress, setProgress] = useState<number>(100);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  
+  // Simulate a 60-second refresh cycle
+  useEffect(() => {
+    const refreshInterval = 60000; // 60 seconds
+    const updateInterval = 1000; // Update every second
+    const steps = refreshInterval / updateInterval;
+    
+    let currentStep = 0;
+    
+    const timer = setInterval(() => {
+      currentStep = (currentStep + 1) % steps;
+      
+      // Calculate progress (100% to 0% and back to 100%)
+      const newProgress = 100 - ((currentStep / steps) * 100);
+      setProgress(newProgress);
+      
+      // Show refreshing animation when progress is near 0
+      setIsRefreshing(newProgress < 5);
+    }, updateInterval);
+    
+    return () => clearInterval(timer);
+  }, []);
   
   // Get color based on progress
   const getColor = () => {
-    if (normalizedProgress > 66) return 'bg-green-500';
-    if (normalizedProgress > 33) return 'bg-yellow-500';
+    if (progress > 66) return 'bg-green-500';
+    if (progress > 33) return 'bg-yellow-500';
     return 'bg-red-500';
   };
   
-  // Format time remaining
-  const formatTimeRemaining = () => {
-    const secondsRemaining = Math.ceil((normalizedProgress / 100) * 30);
-    return `${secondsRemaining}s`;
-  };
-  
-  // Determine if we should show the animated stripes
-  const isRefreshing = normalizedProgress < 100;
-  
   return (
-    <div className={`flex items-center ${className}`}>
-      <button
-        onClick={onRefresh}
-        className={`p-1 rounded-full hover:bg-gray-700 mr-2 transition-colors ${
-          isRefreshing ? 'animate-spin text-blue-400' : 'text-gray-400'
-        }`}
-        title="Force refresh"
-      >
-        <RefreshCw size={16} />
-      </button>
-      
-      <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${getColor()} transition-all duration-1000 ease-linear ${
-            isRefreshing ? 'animate-progress-bar-stripes' : ''
-          }`}
-          style={{ width: `${normalizedProgress}%` }}
-        ></div>
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-gray-400">Next refresh</span>
+        <span className="text-xs font-medium">
+          {isRefreshing ? 'Refreshing...' : `${Math.ceil(progress / (100/60))}s`}
+        </span>
       </div>
-      
-      <div className="ml-2 text-xs text-gray-400 min-w-[30px] text-right">
-        {formatTimeRemaining()}
+      <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+        <div 
+          className={`h-full ${getColor()} transition-all duration-1000 ${isRefreshing ? 'animate-pulse' : ''}`}
+          style={{ width: `${progress}%` }}
+        />
       </div>
     </div>
   );

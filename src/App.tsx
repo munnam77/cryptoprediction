@@ -1,7 +1,13 @@
-import AppContainer from './components/AppContainer';
+import React from 'react';
+import MainDashboard from './components/MainDashboard';
+import { ThemeProvider } from './context/ThemeContext';
 
-function App() {
-  return <AppContainer />;
-}
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <MainDashboard />
+    </ThemeProvider>
+  );
+};
 
 export default App;

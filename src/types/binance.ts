@@ -49,11 +49,10 @@ export enum KlineInterval {
 
 export interface BinanceSymbolInfo {
   symbol: string;
-  status: string;
   baseAsset: string;
   quoteAsset: string;
+  status: string;
   isSpotTradingAllowed: boolean;
-  filters: any[];
 }
 
 export interface BinanceKline {
@@ -72,82 +71,39 @@ export interface BinanceKline {
 
 export interface BinanceTicker {
   symbol: string;
-  bidPrice: string;
-  bidQty: string;
-  askPrice: string;
-  askQty: string;
-  lastPrice: string;
-  lastQty: string;
-  volume: string;
-  quoteVolume: string;
   priceChangePercent: string;
-  weightedAvgPrice: string;
-  prevClosePrice: string;
-  openPrice: string;
+  lastPrice: string;
   highPrice: string;
   lowPrice: string;
-  openTime: number;
-  closeTime: number;
+  volume: string;
+  quoteVolume: string;
+  openPrice: string;
+  bidPrice: string;
+  askPrice: string;
 }
 
 export interface MarketData {
   symbol: string;
   baseAsset: string;
   quoteAsset: string;
+  name: string;
   price: number;
   priceChangePercent: number;
+  priceChangePercent7d?: number;
   volume: number;
   volumeChangePercent: number;
-  historicalData?: BinanceKline[];
-  volatility?: number;
-  volatilityTrend?: 'increasing' | 'stable' | 'decreasing';
-  liquidity?: number;
-  rsi?: number;
-  btcCorrelation?: number;
-  momentum?: number;
+  high24h: number;
+  low24h: number;
+  marketCap: number;
+  circulatingSupply?: number;
+  liquidity: number;
+  volatility: number;
   sentiment?: number;
-  signalStrength?: number;
-  signalDirection?: 'buy' | 'sell' | 'neutral';
-  profitTarget?: number;
-  trend?: {
-    direction: 'up' | 'down' | 'sideways';
-    strength: number;
-    duration: number;
-  };
-  breakout?: {
-    price: number;
-    type: 'resistance' | 'support';
-    time: number;
-  };
-  pivotPoint?: {
-    price: number;
-    type: 'resistance' | 'support';
-    strength: number;
-  };
-  orderBookImbalance?: number;
-  tradingZones?: Array<{
-    price: number;
-    intensity: number;
-  }>;
-  whaleActivity?: {
-    buyPressure: number;
-    sellPressure: number;
-    lastTransaction?: {
-      amount: number;
-      type: 'buy' | 'sell';
-      time: number;
-    };
-  };
-  consecutiveGains?: number;
-  gemScore?: number;
-  marketCap?: number;
-  riskScore?: number;
-  priceVelocity?: number;
-  priceVelocityTrend?: 'accelerating' | 'decelerating' | 'stable';
-  pumpProbability?: number;
-  sellPressure?: number;
-  buyPressure?: number;
-  baseAssetVolume?: number;
+  prediction: 'up' | 'down' | 'neutral';
+  confidence: number;
+  trending?: boolean;
+  watchlist?: boolean;
+  description?: string;
 }
 
 export interface WebSocketMessage {

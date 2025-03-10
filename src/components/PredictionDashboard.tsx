@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToMarketData, unsubscribeFromMarketData } from '../services/BinanceService';
-import type { MarketData } from '../types/binance';
-import { ArrowUp, ArrowDown, Clock, AlertTriangle, CheckCircle, TrendingUp, BarChart3 } from 'lucide-react';
+import type { MarketData, TimeFrame } from '../types/binance';
+import { ArrowUp, ArrowDown, Clock, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Sparkles, Zap, ChevronRight, RefreshCw, TrendingDown, LineChart } from 'lucide-react';
+import MomentumArrow from './MomentumArrow';
+import OrderBookImbalanceTag from './OrderBookImbalanceTag';
 
 interface PredictionDashboardProps {
-  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  timeframe: TimeFrame;
   predictedGainers: MarketData[];
   actualGainers: MarketData[];
   isHistoricalView?: boolean;
   historicalTimestamp?: number;
+  isLoading: boolean;
 }
 
 /**
@@ -20,11 +23,32 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({
   predictedGainers,
   actualGainers,
   isHistoricalView = false,
-  historicalTimestamp = Date.now()
+  historicalTimestamp = Date.now(),
+  isLoading
 }) => {
-  const [activeTab, setActiveTab] = useState<'predictions' | 'performance'>('predictions');
+  const [activeTab, setActiveTab] = useState<'predictions' | 'accuracy'>('predictions');
   const [liveData, setLiveData] = useState<MarketData[]>([]);
   const [showAccuracy, setShowAccuracy] = useState<boolean>(false);
+  const [animateRows, setAnimateRows] = useState<boolean>(false);
+  const [isTimeframeChanging, setIsTimeframeChanging] = useState<boolean>(false);
+  const prevTimeframeRef = useRef<TimeFrame>(timeframe);
+
+  // Handle timeframe changes with animation
+  useEffect(() => {
+    if (prevTimeframeRef.current !== timeframe) {
+      // Timeframe has changed
+      setIsTimeframeChanging(true);
+      
+      // Animate the transition
+      setTimeout(() => {
+        setIsTimeframeChanging(false);
+        prevTimeframeRef.current = timeframe;
+      }, 500);
+      
+      // Reset live data when timeframe changes
+      setLiveData([]);
+    }
+  }, [timeframe]);
 
   // Setup WebSocket subscription for real-time data
   useEffect(() => {
@@ -36,16 +60,24 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({
       ...actualGainers.map(coin => coin.symbol)
     ])];
 
-    // Subscribe to real-time updates
-    subscribeToMarketData(symbols, (updatedData) => {
-      setLiveData(updatedData);
-    });
+    // Only subscribe if we have symbols and we're not changing timeframes
+    if (symbols.length > 0 && !isTimeframeChanging) {
+      console.log(`Subscribing to ${symbols.length} symbols for timeframe ${timeframe}`);
+      
+      // Subscribe to real-time updates
+      subscribeToMarketData(symbols, (updatedData) => {
+        setLiveData(updatedData);
+        // Trigger row animation when data updates
+        setAnimateRows(true);
+        setTimeout(() => setAnimateRows(false), 1000);
+      });
+    }
 
-    // Cleanup subscription on unmount
+    // Cleanup subscription on unmount or timeframe change
     return () => {
       unsubscribeFromMarketData();
     };
-  }, [predictedGainers, actualGainers, isHistoricalView]);
+  }, [predictedGainers, actualGainers, isHistoricalView, timeframe, isTimeframeChanging]);
 
   // Merge live data with predictions/actuals
   const mergeWithLiveData = (data: MarketData[]): MarketData[] => {
@@ -103,14 +135,14 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({
   const displayActuals = mergeWithLiveData(actualGainers);
 
   // Calculate prediction accuracy
-  const calculateAccuracy = (): number => {
+  const calculateAccuracy = () => {
     if (!predictedGainers.length || !actualGainers.length) return 0;
     
-    // Count how many predicted coins are in the actual top gainers
-    const correctPredictions = predictedGainers.filter(predicted => 
-      actualGainers.some(actual => actual.symbol === predicted.symbol)
-    ).length;
+    // Count how many predicted gainers are in the actual gainers list
+    const predictedSymbols = predictedGainers.map(coin => coin.symbol);
+    const actualSymbols = actualGainers.map(coin => coin.symbol);
     
+    const correctPredictions = predictedSymbols.filter(symbol => actualSymbols.includes(symbol)).length;
     return (correctPredictions / predictedGainers.length) * 100;
   };
 
@@ -121,270 +153,244 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({
     return 'text-red-400';
   };
 
-  // Render the predictions table
-  const renderPredictionsTable = () => {
-    return (
-      <div className="overflow-hidden rounded-lg border border-gray-700/50">
-        <table className="min-w-full divide-y divide-gray-700/50">
-          <thead className="bg-gray-800/70">
-            <tr>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Coin
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Price
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Predicted %
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Confidence
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Vol Change %
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-gray-800/30 divide-y divide-gray-700/30">
-            {displayPredictions.length > 0 ? (
-              displayPredictions.map((coin, index) => {
-                const baseAsset = coin.symbol.replace('USDT', '');
-                return (
-                  <tr key={coin.symbol} className={index % 2 === 0 ? 'bg-gray-800/10' : 'bg-gray-800/20'}>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="text-sm font-medium text-white">{baseAsset}</div>
-                        <div className="ml-2">
-                          {coin.volatility && coin.volatility > 80 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-900/50 text-orange-200">
-                              High Vol
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                      ${coin.price.toFixed(coin.price < 1 ? 6 : 2)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end">
-                        {formatPercentWithColor(coin.priceChangePercent)}
-                        {Math.abs(coin.priceChangePercent) > 10 && (
-                          <span className="ml-1">
-                            {coin.priceChangePercent > 0 ? 
-                              <ArrowUp size={14} className="text-green-400" /> : 
-                              <ArrowDown size={14} className="text-red-400" />
-                            }
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            coin.pumpProbability && coin.pumpProbability > 70 ? 'bg-green-500' : 
-                            coin.pumpProbability && coin.pumpProbability > 50 ? 'bg-yellow-500' : 
-                            'bg-red-500'
-                          }`}
-                          style={{ width: `${coin.pumpProbability || 0}%` }}
-                        ></div>
-                      </div>
-                      <div className="text-xs mt-1 text-gray-400">
-                        {coin.pumpProbability ? `${Math.round(coin.pumpProbability)}%` : 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                      {formatPercentWithColor(coin.volumeChangePercent)}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={5} className="px-4 py-4 text-center text-sm text-gray-400">
-                  No predictions available for this timeframe
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    );
+  // Get timeframe description
+  const getTimeframeDescription = (): string => {
+    switch (timeframe) {
+      case '15m': return 'Short-term scalping';
+      case '30m': return 'Quick trades';
+      case '1h': return 'Hourly trends';
+      case '4h': return 'Medium-term swings';
+      case '1d': return 'Daily movements';
+      default: return '';
+    }
   };
 
-  // Render the performance table (actual gainers)
-  const renderPerformanceTable = () => {
-    return (
-      <div className="overflow-hidden rounded-lg border border-gray-700/50">
-        <table className="min-w-full divide-y divide-gray-700/50">
-          <thead className="bg-gray-800/70">
-            <tr>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Coin
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Price
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Actual %
-              </th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Vol Change %
-              </th>
-              <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Predicted
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-gray-800/30 divide-y divide-gray-700/30">
-            {displayActuals.length > 0 ? (
-              displayActuals.map((coin, index) => {
-                const baseAsset = coin.symbol.replace('USDT', '');
-                const wasPredicted = predictedGainers.some(predicted => predicted.symbol === coin.symbol);
-                
-                return (
-                  <tr key={coin.symbol} className={index % 2 === 0 ? 'bg-gray-800/10' : 'bg-gray-800/20'}>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="text-sm font-medium text-white">{baseAsset}</div>
-                        {index === 0 && (
-                          <div className="ml-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-900/50 text-green-200">
-                              Top Gainer
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                      ${coin.price.toFixed(coin.price < 1 ? 6 : 2)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end">
-                        {formatPercentWithColor(coin.priceChangePercent)}
-                        {Math.abs(coin.priceChangePercent) > 10 && (
-                          <span className="ml-1">
-                            {coin.priceChangePercent > 0 ? 
-                              <ArrowUp size={14} className="text-green-400" /> : 
-                              <ArrowDown size={14} className="text-red-400" />
-                            }
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                      {formatPercentWithColor(coin.volumeChangePercent)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-center">
-                      {wasPredicted ? (
-                        <CheckCircle size={16} className="inline-block text-green-400" />
-                      ) : (
-                        <AlertTriangle size={16} className="inline-block text-yellow-400" />
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={5} className="px-4 py-4 text-center text-sm text-gray-400">
-                  No actual gainers data available
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    );
+  // Format price with appropriate precision
+  const formatPrice = (price: number) => {
+    if (price >= 1000) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(3);
+    if (price >= 0.01) return price.toFixed(5);
+    return price.toFixed(8);
   };
 
-  // Calculate accuracy
-  const accuracy = calculateAccuracy();
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <div className="bg-crypto-dark rounded-xl shadow-crypto-lg p-6 animate-pulse">
+        <div className="h-8 w-64 bg-gray-800 rounded mb-6"></div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="h-64 bg-gray-800 rounded"></div>
+          <div className="h-64 bg-gray-800 rounded"></div>
+          <div className="h-64 bg-gray-800 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-gray-800/30 rounded-lg border border-gray-700/50 overflow-hidden shadow-lg">
-      {/* Header */}
-      <div className="bg-gray-800/70 px-4 py-3 flex justify-between items-center border-b border-gray-700/50">
-        <div className="flex items-center">
-          <h3 className="text-lg font-medium text-white">{timeframe} Predictions</h3>
-          <div className="ml-3 flex items-center text-sm text-gray-400">
-            <Clock size={14} className="mr-1" />
-            <span>{getHeaderTime()}</span>
-          </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          {/* Accuracy Badge */}
-          <button 
-            className="flex items-center px-2 py-1 rounded bg-gray-700/50 hover:bg-gray-700 transition-colors duration-200"
-            onClick={() => setShowAccuracy(!showAccuracy)}
-            title="Toggle accuracy display"
-          >
-            <BarChart3 size={14} className="mr-1 text-indigo-400" />
-            <span className="text-xs">Accuracy</span>
-          </button>
+    <div className="bg-crypto-dark rounded-xl shadow-crypto-lg overflow-hidden">
+      <div className="p-4 border-b border-gray-800">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold flex items-center">
+            <Zap className="h-5 w-5 mr-2 text-yellow-500" />
+            Prediction Engine
+          </h2>
           
-          {/* Tab Buttons */}
-          <div className="flex rounded-md overflow-hidden">
+          {/* Tab selector */}
+          <div className="flex rounded-lg overflow-hidden">
             <button
               className={`px-3 py-1 text-sm font-medium ${
-                activeTab === 'predictions' 
-                  ? 'bg-indigo-600 text-white' 
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              } transition-colors duration-200`}
+                activeTab === 'predictions'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
               onClick={() => setActiveTab('predictions')}
             >
-              <div className="flex items-center">
-                <TrendingUp size={14} className="mr-1" />
-                <span>Predictions</span>
-              </div>
+              Predictions
             </button>
             <button
               className={`px-3 py-1 text-sm font-medium ${
-                activeTab === 'performance' 
-                  ? 'bg-indigo-600 text-white' 
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              } transition-colors duration-200`}
-              onClick={() => setActiveTab('performance')}
+                activeTab === 'accuracy'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+              onClick={() => setActiveTab('accuracy')}
             >
-              <div className="flex items-center">
-                <CheckCircle size={14} className="mr-1" />
-                <span>Actuals</span>
-              </div>
+              Accuracy Metrics
             </button>
           </div>
         </div>
       </div>
       
-      {/* Accuracy Display */}
-      {showAccuracy && (
-        <div className="bg-gray-800/50 px-4 py-2 border-b border-gray-700/50">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-400">
-              Prediction Accuracy
-            </div>
-            <div className={`text-sm font-medium ${getAccuracyColorClass(accuracy)}`}>
-              {accuracy.toFixed(0)}%
-            </div>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-1.5 mt-1">
-            <div 
-              className={`h-1.5 rounded-full ${
-                accuracy >= 70 ? 'bg-green-500' : 
-                accuracy >= 50 ? 'bg-yellow-500' : 
-                'bg-red-500'
-              }`}
-              style={{ width: `${accuracy}%` }}
-            ></div>
+      {activeTab === 'predictions' && (
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {predictedGainers.slice(0, 6).map((coin) => (
+              <div 
+                key={coin.symbol}
+                className="bg-gray-800/50 rounded-lg p-4 hover:bg-gray-800 transition-colors"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-bold text-lg">{coin.symbol.replace('USDT', '')}</h3>
+                    <p className="text-sm text-gray-400">${formatPrice(coin.price)}</p>
+                  </div>
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    coin.prediction === 'up' ? 'bg-green-500/20 text-green-400' : 
+                    coin.prediction === 'down' ? 'bg-red-500/20 text-red-400' : 
+                    'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {coin.prediction === 'up' ? 'Buy' : 
+                     coin.prediction === 'down' ? 'Sell' : 'Hold'}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Confidence:</span>
+                    <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${
+                          coin.prediction === 'up' ? 'bg-green-500' : 
+                          coin.prediction === 'down' ? 'bg-red-500' : 
+                          'bg-gray-500'
+                        }`}
+                        style={{ width: `${coin.confidence}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium">{coin.confidence.toFixed(0)}%</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Price Change:</span>
+                    <span className={`text-sm font-medium ${
+                      coin.priceChangePercent >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {coin.priceChangePercent >= 0 ? '+' : ''}{coin.priceChangePercent.toFixed(2)}%
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Momentum:</span>
+                    <MomentumArrow value={coin.priceChangePercent * 2} />
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Order Book:</span>
+                    <OrderBookImbalanceTag value={coin.priceChangePercent * 2} />
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Timeframe:</span>
+                    <span className="text-sm font-medium">{timeframe}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {predictedGainers.length === 0 && (
+              <div className="col-span-3 text-center py-12 text-gray-500">
+                No predictions available for {timeframe} timeframe
+              </div>
+            )}
           </div>
         </div>
       )}
       
-      {/* Content */}
-      <div className="p-4">
-        {activeTab === 'predictions' ? renderPredictionsTable() : renderPerformanceTable()}
-      </div>
+      {activeTab === 'accuracy' && (
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Accuracy metrics */}
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <h3 className="font-bold text-lg mb-4 flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2 text-blue-500" />
+                Prediction Accuracy
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Overall Accuracy:</span>
+                    <span className="text-sm font-medium">{calculateAccuracy().toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500"
+                      style={{ width: `${calculateAccuracy()}%` }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Bullish Predictions:</span>
+                    <span className="text-sm font-medium">
+                      {predictedGainers.filter(coin => coin.prediction === 'up').length}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500"
+                      style={{ 
+                        width: `${predictedGainers.length ? 
+                          (predictedGainers.filter(coin => coin.prediction === 'up').length / predictedGainers.length) * 100 : 0}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Bearish Predictions:</span>
+                    <span className="text-sm font-medium">
+                      {predictedGainers.filter(coin => coin.prediction === 'down').length}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-red-500"
+                      style={{ 
+                        width: `${predictedGainers.length ? 
+                          (predictedGainers.filter(coin => coin.prediction === 'down').length / predictedGainers.length) * 100 : 0}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Neutral Predictions:</span>
+                    <span className="text-sm font-medium">
+                      {predictedGainers.filter(coin => coin.prediction === 'neutral').length}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gray-500"
+                      style={{ 
+                        width: `${predictedGainers.length ? 
+                          (predictedGainers.filter(coin => coin.prediction === 'neutral').length / predictedGainers.length) * 100 : 0}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Performance chart */}
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <h3 className="font-bold text-lg mb-4 flex items-center">
+                <LineChart className="h-5 w-5 mr-2 text-blue-500" />
+                Performance Over Time
+              </h3>
+              
+              <div className="h-48 flex items-center justify-center border border-gray-700 rounded">
+                <p className="text-gray-500">Performance chart visualization would appear here</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

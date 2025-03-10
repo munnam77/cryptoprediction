@@ -1,81 +1,40 @@
 import React from 'react';
 
 interface VolatilityRangeBarProps {
-  volatility: number; // 0-100 volatility score
-  price: number;
-  className?: string;
-  width?: number;
-  height?: number;
+  value: number; // 0-100 scale
 }
 
 /**
  * VolatilityRangeBar Component
- * Displays a horizontal gradient bar showing volatility intensity
+ * 
+ * Displays a horizontal gradient bar representing volatility
  */
-const VolatilityRangeBar: React.FC<VolatilityRangeBarProps> = ({
-  volatility = 0,
-  price = 0,
-  className = '',
-  width = 80,
-  height = 8
-}) => {
-  if (!price || volatility < 0) {
-    return null;
-  }
-
-  // Calculate visual range based on volatility score
-  const rangePercent = volatility;
-  const estimatedLow = price * (1 - (rangePercent / 200)); // Max 50% down
-  const estimatedHigh = price * (1 + (rangePercent / 200)); // Max 50% up
+const VolatilityRangeBar: React.FC<VolatilityRangeBarProps> = ({ value }) => {
+  // Ensure value is within 0-100 range
+  const normalizedValue = Math.min(100, Math.max(0, value));
   
-  // Format price based on magnitude
-  const formatPrice = (value: number | null | undefined) => {
-    if (!value) return '$0.00';
-    if (value >= 1000) {
-      return `$${value.toFixed(2)}`;
-    } else if (value >= 1) {
-      return `$${value.toFixed(3)}`;
-    } else if (value >= 0.01) {
-      return `$${value.toFixed(4)}`;
+  // Determine color based on volatility level
+  const getGradientColors = () => {
+    if (normalizedValue > 75) {
+      return 'from-red-500 to-orange-500'; // High volatility
+    } else if (normalizedValue > 50) {
+      return 'from-orange-500 to-yellow-500'; // Medium-high volatility
+    } else if (normalizedValue > 25) {
+      return 'from-yellow-500 to-green-500'; // Medium volatility
     } else {
-      return `$${value.toFixed(6)}`;
+      return 'from-blue-500 to-green-500'; // Low volatility
     }
   };
   
-  // Get color based on volatility level
-  const getGradientColors = () => {
-    if (volatility >= 80) return 'from-red-500 to-orange-500';
-    if (volatility >= 50) return 'from-orange-500 to-yellow-500';
-    if (volatility >= 30) return 'from-blue-500 to-purple-500';
-    return 'from-green-500 to-blue-500';
-  };
-
   return (
-    <div 
-      className={`relative ${className}`}
-      title={`Volatility: ${volatility.toFixed(1)}% Range: ${formatPrice(estimatedLow)}-${formatPrice(estimatedHigh)}`}
-    >
-      {/* Range bar */}
-      <div 
-        className="rounded-full overflow-hidden bg-gray-700/30"
-        style={{ width: `${width}px`, height: `${height}px` }}
-      >
+    <div className="flex items-center space-x-2">
+      <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
         <div 
-          className={`h-full bg-gradient-to-r ${getGradientColors()} transition-all duration-500`}
-          style={{ 
-            width: `${Math.min(100, volatility)}%`
-          }}
+          className={`h-full rounded-full bg-gradient-to-r ${getGradientColors()} transition-all duration-300`}
+          style={{ width: `${normalizedValue}%` }}
         />
       </div>
-      
-      {/* Volatility threshold markers */}
-      {[30, 50, 80].map(threshold => (
-        <div
-          key={threshold}
-          className="absolute top-0 bottom-0 w-px bg-gray-400/30"
-          style={{ left: `${threshold}%` }}
-        />
-      ))}
+      <span className="text-xs font-medium">{Math.round(normalizedValue)}</span>
     </div>
   );
 };

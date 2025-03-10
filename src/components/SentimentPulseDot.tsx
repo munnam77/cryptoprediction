@@ -1,67 +1,49 @@
 import React from 'react';
 
 interface SentimentPulseDotProps {
-  sentiment: number; // -100 to 100
-  source: string;
-  size?: number;
-  className?: string;
+  sentiment: number; // -100 to 100 scale
 }
 
 /**
  * SentimentPulseDot Component
- * Pulsing dot showing market sentiment from social media
+ * 
+ * Displays a colored dot that pulses based on market sentiment
+ * Negative values = bearish (red)
+ * Positive values = bullish (green)
+ * The intensity of the pulse and color depends on the sentiment strength
  */
-const SentimentPulseDot: React.FC<SentimentPulseDotProps> = ({
-  sentiment,
-  source,
-  size = 12,
-  className = ''
-}) => {
-  // Ensure sentiment is between -100 and 100
-  const validSentiment = Math.min(Math.max(sentiment, -100), 100);
+const SentimentPulseDot: React.FC<SentimentPulseDotProps> = ({ sentiment }) => {
+  // Normalize sentiment to ensure it's within -100 to 100 range
+  const normalizedSentiment = Math.min(100, Math.max(-100, sentiment));
   
-  // Get color based on sentiment
+  // Determine color based on sentiment
   const getColor = () => {
-    if (validSentiment >= 70) return 'bg-green-500';
-    if (validSentiment >= 30) return 'bg-green-400';
-    if (validSentiment >= 0) return 'bg-green-300';
-    if (validSentiment >= -30) return 'bg-red-300';
-    if (validSentiment >= -70) return 'bg-red-400';
+    if (normalizedSentiment > 50) return 'bg-green-500';
+    if (normalizedSentiment > 20) return 'bg-green-400';
+    if (normalizedSentiment > 0) return 'bg-green-300';
+    if (normalizedSentiment > -20) return 'bg-red-300';
+    if (normalizedSentiment > -50) return 'bg-red-400';
     return 'bg-red-500';
   };
   
-  // Get pulse animation based on sentiment strength
-  const getPulseAnimation = () => {
-    const absValue = Math.abs(validSentiment);
-    
-    if (absValue >= 70) return 'animate-pulse';
-    if (absValue >= 50) return 'animate-pulse';
+  // Determine pulse animation speed based on sentiment intensity
+  const getPulseClass = () => {
+    const intensity = Math.abs(normalizedSentiment);
+    if (intensity > 70) return 'animate-pulse-fast';
+    if (intensity > 40) return 'animate-pulse';
+    if (intensity > 10) return 'animate-pulse-slow';
     return '';
   };
   
-  // Get tooltip text
-  const getTooltip = () => {
-    let strength = '';
-    const absValue = Math.abs(validSentiment);
-    
-    if (absValue >= 70) strength = 'Very';
-    else if (absValue >= 30) strength = 'Moderately';
-    else strength = 'Slightly';
-    
-    const direction = validSentiment >= 0 ? 'bullish' : 'bearish';
-    
-    return `${strength} ${direction} sentiment (${validSentiment.toFixed(0)}) from ${source}`;
-  };
-  
   return (
-    <div 
-      className={`inline-block ${className}`}
-      title={getTooltip()}
-    >
+    <div className="flex items-center space-x-2">
       <div 
-        className={`rounded-full ${getColor()} ${getPulseAnimation()}`}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        className={`w-3 h-3 rounded-full ${getColor()} ${getPulseClass()}`}
+        title={`Market sentiment: ${normalizedSentiment > 0 ? 'Bullish' : 'Bearish'} (${normalizedSentiment})`}
       />
+      <span className="text-xs font-medium">
+        {normalizedSentiment > 0 ? '+' : ''}{normalizedSentiment}
+      </span>
     </div>
   );
 };

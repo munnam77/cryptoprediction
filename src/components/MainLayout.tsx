@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { MarketData, TimeFrame } from '../types/binance';
 import TimeframeSelector from './TimeframeSelector';
 import PredictionDashboard from './PredictionDashboard';
@@ -20,6 +20,7 @@ import TimeframeRewindSlider from './TimeframeRewindSlider';
 import CorrelationHeatDot from './CorrelationHeatDot';
 import LoadingSkeleton from './LoadingSkeleton';
 import AudioPing from './AudioPing';
+import { ChevronLeft, ChevronRight, Zap, TrendingUp, BarChart3, Layers, ArrowUpDown } from 'lucide-react';
 
 interface MainLayoutProps {
   marketSentiment: number;
@@ -59,6 +60,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const [historicalTimestamp, setHistoricalTimestamp] = useState<number>(Date.now());
   const [isHistoricalView, setIsHistoricalView] = useState<boolean>(false);
   const [showHotZone, setShowHotZone] = useState<boolean>(true);
+  const [showTradingPairs, setShowTradingPairs] = useState<boolean>(false);
+  const [layoutMode, setLayoutMode] = useState<'prediction' | 'balanced' | 'trading'>('prediction');
+  const [isTimeframeChanging, setIsTimeframeChanging] = useState<boolean>(false);
+  const prevTimeframeRef = useRef<TimeFrame>(selectedTimeframe);
 
   // Helper to parse trading pair symbol
   const parseSymbol = (symbol: string) => {
@@ -175,8 +180,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           </span>
           {pair.trend && (
             <TrendStrengthIcon
-              trend={pair.trend.direction === 'up' ? 'bull' : 'bear'}
-              strength={Math.ceil(pair.trend.strength / 33) as 1 | 2 | 3}
+              direction={pair.trend.direction}
+              strength={pair.trend.strength}
               className="ml-2 inline-block"
             />
           )}
@@ -243,6 +248,72 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     </table>
   );
 
+  // Layout toggle handler
+  const toggleLayout = () => {
+    if (layoutMode === 'prediction') {
+      setLayoutMode('balanced');
+    } else if (layoutMode === 'balanced') {
+      setLayoutMode('trading');
+    } else {
+      setLayoutMode('prediction');
+    }
+  };
+
+  // Get layout classes based on current mode
+  const getLayoutClasses = () => {
+    switch (layoutMode) {
+      case 'prediction':
+        return {
+          tradingPanel: 'w-0 hidden md:block md:w-[20%] lg:w-[25%]',
+          predictionPanel: 'w-[60%] md:w-[50%] lg:w-[45%]',
+          topPicksPanel: 'w-[40%] md:w-[30%] lg:w-[30%]'
+        };
+      case 'balanced':
+        return {
+          tradingPanel: 'w-[25%] md:w-[25%] lg:w-[25%]',
+          predictionPanel: 'w-[45%] md:w-[45%] lg:w-[45%]',
+          topPicksPanel: 'w-[30%] md:w-[30%] lg:w-[30%]'
+        };
+      case 'trading':
+        return {
+          tradingPanel: 'w-[40%] md:w-[35%] lg:w-[35%]',
+          predictionPanel: 'w-[35%] md:w-[35%] lg:w-[35%]',
+          topPicksPanel: 'w-[25%] md:w-[30%] lg:w-[30%]'
+        };
+      default:
+        return {
+          tradingPanel: 'w-[25%]',
+          predictionPanel: 'w-[45%]',
+          topPicksPanel: 'w-[30%]'
+        };
+    }
+  };
+
+  const layoutClasses = getLayoutClasses();
+
+  // Handle timeframe changes with animation
+  useEffect(() => {
+    if (prevTimeframeRef.current !== selectedTimeframe) {
+      // Timeframe has changed
+      setIsTimeframeChanging(true);
+      console.log(`MainLayout detected timeframe change to: ${selectedTimeframe}`);
+      
+      // Animate the transition
+      setTimeout(() => {
+        setIsTimeframeChanging(false);
+        prevTimeframeRef.current = selectedTimeframe;
+      }, 800);
+    }
+  }, [selectedTimeframe]);
+
+  // Enhanced timeframe change handler
+  const handleTimeframeChangeWithFeedback = (timeframe: TimeFrame) => {
+    if (timeframe !== selectedTimeframe) {
+      setIsTimeframeChanging(true);
+      onTimeframeChange(timeframe);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-transparent text-gray-100 px-4 py-2">
       {/* Audio Ping Element (hidden) */}
@@ -250,7 +321,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       
       {/* Historical data indicator - show when viewing past data */}
       {isHistoricalView && (
-        <div className="fixed top-16 right-4 z-50 bg-purple-900 bg-opacity-80 text-white px-3 py-2 rounded-md text-sm backdrop-blur-sm border border-purple-700/50 shadow-lg">
+        <div className="fixed top-16 right-4 z-50 bg-purple-900/90 text-white px-3 py-2 rounded-md text-sm backdrop-blur-sm border border-purple-700/50 shadow-lg animate-fade-in">
           <div className="font-medium">Historical View</div>
           <div className="text-xs">{new Date(historicalTimestamp).toLocaleString()}</div>
           <button 
@@ -266,8 +337,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       )}
       
       {/* Market Overview Bar */}
-      <div className="mb-4 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="mb-4 bg-gray-800/80 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 flex flex-wrap md:flex-nowrap items-center justify-between shadow-lg">
+        <div className="flex items-center space-x-4 mb-2 md:mb-0">
           <div className="flex flex-col">
             <span className="text-xs text-gray-400">Market Sentiment</span>
             <span className={`font-medium ${marketSentiment > 60 ? 'text-green-400' : marketSentiment < 40 ? 'text-red-400' : 'text-yellow-400'}`}>
@@ -293,18 +364,27 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             </span>
           </div>
         </div>
-        <TimeframeSelector 
-          selectedTimeframe={selectedTimeframe} 
-          onTimeframeChange={onTimeframeChange}
-          timeframes={['15m', '30m', '1h', '4h', '1d']} 
-        />
+        <div className="flex items-center space-x-3">
+          <TimeframeSelector 
+            selectedTimeframe={selectedTimeframe} 
+            onTimeframeChange={handleTimeframeChangeWithFeedback}
+            timeframes={['15m', '30m', '1h', '4h', '1d']} 
+          />
+          <button 
+            onClick={toggleLayout}
+            className="flex items-center justify-center p-2 bg-indigo-600/80 hover:bg-indigo-500/80 rounded-md transition-colors duration-200"
+            title="Toggle layout mode"
+          >
+            <Layers size={16} />
+          </button>
+        </div>
       </div>
       
-      {/* Main Content Area - Following exact layout from context.md */}
-      <div className="flex flex-1 overflow-hidden space-x-4">
-        {/* Left Panel - Trading Pair Table (30% width) */}
-        <div className="w-[30%] overflow-hidden flex flex-col">
-          <div className="flex-1 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
+      {/* Main Content Area - Redesigned for better focus on predictions and top picks */}
+      <div className="flex flex-1 overflow-hidden space-x-4 transition-all duration-300 ease-in-out">
+        {/* Left Panel - Trading Pair Table (collapsible) */}
+        <div className={`${layoutClasses.tradingPanel} overflow-hidden flex flex-col transition-all duration-300 ease-in-out`}>
+          <div className="flex-1 bg-gray-800/80 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
             <h2 className="text-lg font-medium mb-3 flex justify-between items-center">
               <span>Trading Pairs</span>
               <span className="text-sm text-gray-400">{allMarketData.length} pairs</span>
@@ -320,11 +400,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
         </div>
         
-        {/* Center Panel - Prediction Engine (40% width) */}
-        <div className="w-[40%] overflow-hidden flex flex-col">
-          <div className="flex-1 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
+        {/* Center Panel - Prediction Engine (expanded) */}
+        <div className={`${layoutClasses.predictionPanel} overflow-hidden flex flex-col transition-all duration-300 ease-in-out`}>
+          <div className="flex-1 bg-gray-800/80 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-medium">Prediction Engine</h2>
+              <div className="flex items-center">
+                <Zap size={20} className="text-indigo-400 mr-2" />
+                <h2 className="text-lg font-medium">Prediction Engine</h2>
+              </div>
               <div className="flex items-center space-x-3">
                 {/* Feature 8: Scalper's Countdown */}
                 <ScalpersCountdown 
@@ -334,26 +417,26 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               </div>
             </div>
             
-            <div className="flex space-x-4 mb-4">
+            <div className="flex flex-wrap md:flex-nowrap space-x-0 md:space-x-4 space-y-2 md:space-y-0 mb-4">
               {/* Feature 9: Price Velocity Ticker */}
               <PriceVelocityTicker
                 velocity={selectedPair?.priceVelocity || 0}
                 trend={selectedPair?.priceVelocityTrend || 'stable'}
-                className="w-1/3"
+                className="w-full md:w-1/3"
               />
               
               {/* Feature 10: Pump Probability Dial */}
               <PumpProbabilityDial
                 probability={selectedPair?.pumpProbability || 0}
                 timeframe={selectedTimeframe}
-                className="w-1/3"
+                className="w-full md:w-1/3"
               />
               
               {/* Feature 11: Scalper's Profit Target */}
               <ScalpersProfitTarget 
                 value={selectedPair?.profitTarget || 5}
                 timeframe={selectedTimeframe}
-                className="w-1/3"
+                className="w-full md:w-1/3"
               />
             </div>
             
@@ -371,18 +454,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             {isLoading ? (
               <LoadingSkeleton type="predictions" rows={5} />
             ) : (
-              <PredictionDashboard
-                timeframe={selectedTimeframe}
-                predictedGainers={lowCapGems.slice(0, 5)}
-                actualGainers={topGainers.slice(0, 5)}
-                isHistoricalView={isHistoricalView}
-                historicalTimestamp={historicalTimestamp}
-              />
+              <div className="bg-gray-900/40 rounded-lg p-3 border border-gray-700/30">
+                <PredictionDashboard
+                  timeframe={selectedTimeframe}
+                  predictedGainers={lowCapGems.slice(0, 5)}
+                  actualGainers={topGainers.slice(0, 5)}
+                  isHistoricalView={isHistoricalView}
+                  historicalTimestamp={historicalTimestamp}
+                />
+              </div>
             )}
             
-            <div className="grid grid-cols-3 gap-3 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
               {/* Feature 12: Micro RSI Bar */}
-              <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600/30">
+              <div className="p-3 bg-gray-900/40 rounded-lg border border-gray-600/30 hover:border-indigo-500/30 transition-colors duration-200">
                 <h4 className="text-xs text-gray-400 mb-1">RSI</h4>
                 <MicroRSIBar 
                   value={selectedPair?.rsi || 50}
@@ -391,7 +476,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
               </div>
               
               {/* Feature 14: Correlation Heat Dot */}
-              <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600/30">
+              <div className="p-3 bg-gray-900/40 rounded-lg border border-gray-600/30 hover:border-indigo-500/30 transition-colors duration-200">
                 <h4 className="text-xs text-gray-400 mb-1">BTC Correlation</h4>
                 <CorrelationHeatDot 
                   value={selectedPair?.btcCorrelation || 0}
@@ -400,7 +485,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 />
               </div>
               
-              <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600/30 flex items-center justify-center">
+              <div className="p-3 bg-gray-900/40 rounded-lg border border-gray-600/30 hover:border-indigo-500/30 transition-colors duration-200 flex items-center justify-center">
                 <div className="text-center">
                   <h4 className="text-xs text-gray-400 mb-1">Alerts</h4>
                   <button 
@@ -415,32 +500,40 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
         </div>
         
-        {/* Right Panel (30% width) */}
-        <div className="w-[30%] overflow-hidden flex flex-col space-y-4">
-          {/* Top Half: Top Picks Cards (Low-Cap Gems) */}
-          <div className="h-1/2 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
-            <h2 className="text-lg font-medium mb-3 flex justify-between items-center">
-              <span>Top Picks</span>
-              <span className="text-sm text-gray-400">Low-Cap Gems</span>
-            </h2>
+        {/* Right Panel - Top Picks and Gainers (combined) */}
+        <div className={`${layoutClasses.topPicksPanel} overflow-hidden flex flex-col transition-all duration-300 ease-in-out`}>
+          {/* Top Picks Section (Low-Cap Gems) - Expanded */}
+          <div className="flex-1 bg-gray-800/80 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center">
+                <TrendingUp size={20} className="text-green-400 mr-2" />
+                <h2 className="text-lg font-medium">Top Picks</h2>
+              </div>
+              <span className="text-sm text-gray-400 bg-gray-700/50 px-2 py-1 rounded">Low-Cap Gems</span>
+            </div>
             {isLoading ? (
               <LoadingSkeleton type="cards" count={5} />
             ) : (
-              <TopPicksCarousel 
-                gems={lowCapGems.slice(0, 6)}
-                timeframe={selectedTimeframe}
-                isHistoricalView={isHistoricalView}
-                historicalTimestamp={historicalTimestamp}
-              />
+              <div className="bg-gray-900/40 rounded-lg p-3 border border-gray-700/30">
+                <TopPicksCarousel 
+                  gems={lowCapGems.slice(0, 6)}
+                  timeframe={selectedTimeframe}
+                  isHistoricalView={isHistoricalView}
+                  historicalTimestamp={historicalTimestamp}
+                />
+              </div>
             )}
           </div>
           
-          {/* Bottom Half: Top Gainers Cards */}
-          <div className="h-1/2 bg-gray-800/60 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
-            <h2 className="text-lg font-medium mb-3 flex justify-between items-center">
-              <span>Top Gainers</span>
+          {/* Top Gainers Section */}
+          <div className="flex-1 bg-gray-800/80 rounded-lg backdrop-blur-sm border border-gray-700/50 p-3 shadow-lg">
+            <div className="flex justify-between items-center mb-3">
               <div className="flex items-center">
-                <span className="text-sm text-gray-400 mr-2">Audio Alerts</span>
+                <BarChart3 size={20} className="text-orange-400 mr-2" />
+                <h2 className="text-lg font-medium">Top Gainers</h2>
+              </div>
+              <div className="flex items-center">
+                <span className="text-sm text-gray-400 mr-2">Audio</span>
                 <button 
                   className={`text-xs px-2 py-1 rounded transition-colors duration-200 ${audioPingEnabled ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-gray-600 hover:bg-gray-500'}`}
                   onClick={() => setAudioPingEnabled(!audioPingEnabled)}
@@ -448,18 +541,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                   {audioPingEnabled ? 'On' : 'Off'}
                 </button>
               </div>
-            </h2>
+            </div>
             {isLoading ? (
               <LoadingSkeleton type="cards" count={5} />
             ) : (
-              <TopGainersCarousel 
-                gainers={topGainers.slice(0, 6)}
-                timeframe={selectedTimeframe}
-                audioPingEnabled={audioPingEnabled}
-                onToggleAudioPing={() => setAudioPingEnabled(!audioPingEnabled)}
-                isHistoricalView={isHistoricalView}
-                historicalTimestamp={historicalTimestamp}
-              />
+              <div className="bg-gray-900/40 rounded-lg p-3 border border-gray-700/30">
+                <TopGainersCarousel 
+                  gainers={topGainers.slice(0, 6)}
+                  timeframe={selectedTimeframe}
+                  audioPingEnabled={audioPingEnabled}
+                  onToggleAudioPing={() => setAudioPingEnabled(!audioPingEnabled)}
+                  isHistoricalView={isHistoricalView}
+                  historicalTimestamp={historicalTimestamp}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -467,10 +562,31 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 shadow-xl">
+        <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-gray-800/90 rounded-lg p-6 shadow-xl border border-gray-700/50">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
             <p className="text-center text-gray-300">Loading market data...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Timeframe Change Indicator */}
+      {isTimeframeChanging && (
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-gray-800/90 rounded-lg p-6 shadow-xl border border-indigo-500/30 animate-timeframe-change">
+            <div className="flex items-center justify-center mb-4">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+                <div className="absolute inset-0 rounded-full border-t-4 border-indigo-500 animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-indigo-400">{selectedTimeframe}</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-gray-300">Updating to {selectedTimeframe} timeframe...</p>
+            <div className="mt-4 w-48 h-1 bg-gray-700 rounded-full overflow-hidden mx-auto">
+              <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-shimmer"></div>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, TrendingUp, Zap, Award, Clock } from 'lucide-react';
-import type { MarketData } from '../types/binance';
+import { ChevronLeft, ChevronRight, TrendingUp, Zap, Star, ArrowUp, Award, Clock, RefreshCw } from 'lucide-react';
+import type { MarketData, TimeFrame } from '../types/binance';
 import VolatilityWaveform from './VolatilityWaveform';
 import MomentumArrow from './MomentumArrow';
 import SentimentPulseDot from './SentimentPulseDot';
@@ -13,7 +13,7 @@ import WhaleTailIcon from './WhaleTailIcon';
 
 interface TopPicksCarouselProps {
   gems: MarketData[];
-  timeframe: '15m' | '30m' | '1h' | '4h' | '1d';
+  timeframe: TimeFrame;
   isHistoricalView?: boolean;
   historicalTimestamp?: number;
 }
@@ -30,12 +30,30 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [isTimeframeChanging, setIsTimeframeChanging] = useState(false);
+  const prevTimeframeRef = useRef<TimeFrame>(timeframe);
   const carouselRef = useRef<HTMLDivElement>(null);
   const visibleCards = 3; // Number of cards visible at once
   
+  // Handle timeframe changes with animation
+  useEffect(() => {
+    if (prevTimeframeRef.current !== timeframe) {
+      // Timeframe has changed
+      setIsTimeframeChanging(true);
+      setCurrentIndex(0); // Reset to first card
+      
+      // Animate the transition
+      setTimeout(() => {
+        setIsTimeframeChanging(false);
+        prevTimeframeRef.current = timeframe;
+      }, 500);
+    }
+  }, [timeframe]);
+  
   // Auto-scroll the carousel every 10 seconds if not in historical view
   useEffect(() => {
-    if (isHistoricalView) return;
+    if (isHistoricalView || isTimeframeChanging) return;
     
     const interval = setInterval(() => {
       if (gems.length > visibleCards) {
@@ -44,11 +62,11 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
     }, 10000);
     
     return () => clearInterval(interval);
-  }, [gems.length, currentIndex, isHistoricalView]);
+  }, [gems.length, currentIndex, isHistoricalView, isTimeframeChanging]);
   
   // Handle previous button click
   const handlePrev = () => {
-    if (isAnimating || gems.length <= visibleCards) return;
+    if (isAnimating || gems.length <= visibleCards || isTimeframeChanging) return;
     
     setIsAnimating(true);
     setCurrentIndex(prev => (prev === 0 ? Math.max(0, gems.length - visibleCards) : prev - 1));
@@ -58,7 +76,7 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
   
   // Handle next button click
   const handleNext = () => {
-    if (isAnimating || gems.length <= visibleCards) return;
+    if (isAnimating || gems.length <= visibleCards || isTimeframeChanging) return;
     
     setIsAnimating(true);
     setCurrentIndex(prev => (prev >= gems.length - visibleCards ? 0 : prev + 1));
@@ -84,7 +102,7 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
     return 'text-red-200';
   };
   
-  // Get features to display for each card
+  // Get features to show for each card
   const getFeaturesToShow = (index: number, data: MarketData): JSX.Element[] => {
     const features: JSX.Element[] = [];
     
@@ -226,6 +244,7 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
     
     const { symbol } = data;
     const baseAsset = symbol.replace('USDT', '');
+    const isHovered = hoveredCard === symbol;
     
     // Calculate market cap category
     const marketCapCategory = () => {
@@ -249,142 +268,201 @@ const TopPicksCarousel: React.FC<TopPicksCarouselProps> = ({
       if (volatility > 60) return 'border-yellow-500';
       if (data.priceChangePercent > 10) return 'border-green-500';
       if (data.priceChangePercent < -10) return 'border-red-500';
-      return 'border-indigo-500';
+      return 'border-gray-700';
     };
     
-    // Get icon based on market cap and performance
+    // Get background gradient based on performance
+    const getBackgroundGradient = () => {
+      if (data.priceChangePercent > 15) return 'bg-gradient-to-br from-green-900/80 to-gray-900';
+      if (data.priceChangePercent > 5) return 'bg-gradient-to-br from-green-800/60 to-gray-900';
+      if (data.priceChangePercent < -15) return 'bg-gradient-to-br from-red-900/80 to-gray-900';
+      if (data.priceChangePercent < -5) return 'bg-gradient-to-br from-red-800/60 to-gray-900';
+      if (data.volatility && data.volatility > 80) return 'bg-gradient-to-br from-orange-900/60 to-gray-900';
+      return 'bg-gradient-to-br from-gray-800/80 to-gray-900';
+    };
+    
+    // Get icon based on performance
     const getIcon = () => {
-      if (data.gemScore && data.gemScore > 80) return <Award className="text-yellow-400" size={16} />;
-      if (data.priceChangePercent > 15) return <TrendingUp className="text-green-400" size={16} />;
-      if (data.volatility && data.volatility > 80) return <Zap className="text-orange-400" size={16} />;
-      return null;
+      if (data.priceChangePercent > 10) {
+        return <ArrowUp size={16} className="text-green-400" />;
+      }
+      if (data.priceChangePercent < -10) {
+        return <TrendingUp size={16} className="text-red-400 transform rotate-180" />;
+      }
+      if (data.volatility && data.volatility > 80) {
+        return <Zap size={16} className="text-yellow-400" />;
+      }
+      return <Star size={16} className="text-indigo-400" />;
     };
     
-    // Get features to show on this card
+    // Get features for this card
     const features = getFeaturesToShow(index, data);
     
     return (
       <div 
-        key={symbol}
-        className={`relative flex-shrink-0 w-[140px] h-[160px] rounded-lg overflow-hidden 
-          bg-gradient-to-br from-gray-800 to-gray-900 
-          border-2 ${getBorderColor()} 
-          shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl
-          ${data.volatility && data.volatility > 70 ? 'animate-pulse-slow' : ''}`}
+        className={`relative rounded-lg overflow-hidden ${getBackgroundGradient()} border-2 ${getBorderColor()} shadow-lg transform transition-all duration-300 ease-in-out ${isHovered ? 'scale-105 shadow-xl z-10' : ''}`}
+        style={{ 
+          width: '130px', 
+          height: '130px',
+          margin: '0 8px',
+          transition: 'all 0.3s ease-in-out'
+        }}
+        onMouseEnter={() => setHoveredCard(symbol)}
+        onMouseLeave={() => setHoveredCard(null)}
       >
-        {/* Card Header */}
-        <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 flex justify-between items-center">
+        {/* Coin Name and Icon */}
+        <div className="absolute top-2 left-2 right-2 flex justify-between items-center">
           <div className="flex items-center">
-            <span className="font-bold text-white">{baseAsset}</span>
             {getIcon()}
+            <span className="ml-1 text-sm font-bold text-white">{baseAsset}</span>
           </div>
-          <span className={`text-xs font-medium ${getColorClass(data.priceChangePercent)}`}>
-            {data.priceChangePercent > 0 ? '+' : ''}{data.priceChangePercent.toFixed(1)}%
-          </span>
+          <div className="text-xs text-gray-400">
+            {marketCapCategory()}
+          </div>
         </div>
         
-        {/* Card Content */}
-        <div className="p-3 relative">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-gray-400">Price</span>
-            <span className="font-medium text-white">{formatPrice(data.price)}</span>
+        {/* Price */}
+        <div className="absolute top-10 left-2 right-2 text-center">
+          <div className="text-lg font-bold text-white">{formatPrice(data.price)}</div>
+        </div>
+        
+        {/* Price Change */}
+        <div className="absolute top-[70px] left-2 right-2 text-center">
+          <div className={`text-sm font-medium ${getColorClass(data.priceChangePercent)}`}>
+            {data.priceChangePercent > 0 ? '+' : ''}{data.priceChangePercent.toFixed(2)}%
           </div>
-          
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-gray-400">Vol Chg</span>
-            <span className={`text-sm font-medium ${getColorClass(data.volumeChangePercent || 0)}`}>
-              {data.volumeChangePercent ? (data.volumeChangePercent > 0 ? '+' : '') + data.volumeChangePercent.toFixed(1) + '%' : 'N/A'}
+        </div>
+        
+        {/* Volume Change */}
+        <div className="absolute top-[90px] left-2 right-2 text-center">
+          <div className="text-xs text-gray-400">
+            Vol: <span className={getColorClass(data.volumeChangePercent)}>
+              {data.volumeChangePercent > 0 ? '+' : ''}{data.volumeChangePercent.toFixed(0)}%
             </span>
           </div>
-          
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-gray-400">Gem Score</span>
-            <div className="flex items-center">
-              <div className="w-16 h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" 
-                  style={{ width: `${data.gemScore || 0}%` }}
-                ></div>
-              </div>
-              <span className="ml-1 text-xs font-medium text-indigo-400">{formatScore(data.gemScore)}</span>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">{marketCapCategory()}</span>
-            <span className="text-xs text-gray-500">{timeframe}</span>
+        </div>
+        
+        {/* Gem Score */}
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+          <div className="px-2 py-0.5 rounded-full bg-indigo-900/60 text-xs text-indigo-200">
+            Score: {formatScore(data.gemScore)}
           </div>
         </div>
         
-        {/* Features */}
+        {/* Render all features */}
         {features}
+        
+        {/* Hover overlay with additional info */}
+        {isHovered && (
+          <div className="absolute inset-0 bg-black/40 flex flex-col justify-center items-center p-2 animate-fade-in">
+            <div className="text-xs text-white mb-1">
+              <span className="font-medium">Volatility:</span> {data.volatility?.toFixed(0) || 'N/A'}
+            </div>
+            {data.pumpProbability && (
+              <div className="text-xs text-white mb-1">
+                <span className="font-medium">Pump Odds:</span> {data.pumpProbability.toFixed(0)}%
+              </div>
+            )}
+            {data.profitTarget && (
+              <div className="text-xs text-white">
+                <span className="font-medium">Target:</span> {data.profitTarget > 0 ? '+' : ''}{data.profitTarget.toFixed(1)}%
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
   
-  // If no gems, show empty state
-  if (!gems || gems.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center text-gray-400">
-          <p>No low-cap gems found</p>
-          <p className="text-sm mt-1">Try changing the timeframe</p>
-        </div>
-      </div>
-    );
-  }
-  
   return (
-    <div className="relative h-full">
-      {/* Carousel Navigation */}
-      {gems.length > visibleCards && (
+    <div className={`relative transition-opacity duration-500 ${isTimeframeChanging ? 'opacity-50' : 'opacity-100'}`}>
+      {/* Timeframe changing indicator */}
+      {isTimeframeChanging && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-gray-900/30 backdrop-blur-sm rounded-lg">
+          <div className="flex flex-col items-center">
+            <RefreshCw size={24} className="text-indigo-400 animate-spin mb-2" />
+            <div className="text-sm text-white">Loading {timeframe} top picks...</div>
+          </div>
+        </div>
+      )}
+      
+      {/* Navigation Buttons */}
+      {gems.length > visibleCards && !isTimeframeChanging && (
         <>
-          <button 
+          <button
             onClick={handlePrev}
-            className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-gray-800/80 hover:bg-gray-700/80 text-white rounded-r-lg p-1 transition-colors duration-200"
             disabled={isAnimating}
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 -ml-4 z-10 bg-gray-800/80 hover:bg-gray-700/80 rounded-full p-1 text-white shadow-lg transition-colors duration-200"
+            aria-label="Previous"
           >
             <ChevronLeft size={20} />
           </button>
-          <button 
+          <button
             onClick={handleNext}
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-gray-800/80 hover:bg-gray-700/80 text-white rounded-l-lg p-1 transition-colors duration-200"
             disabled={isAnimating}
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 -mr-4 z-10 bg-gray-800/80 hover:bg-gray-700/80 rounded-full p-1 text-white shadow-lg transition-colors duration-200"
+            aria-label="Next"
           >
             <ChevronRight size={20} />
           </button>
         </>
       )}
       
-      {/* Carousel Track */}
+      {/* Carousel Container */}
       <div 
         ref={carouselRef}
-        className="flex items-center justify-start space-x-4 h-full overflow-hidden px-2"
+        className="flex justify-center items-center py-2 overflow-hidden"
       >
         <div 
-          className="flex space-x-4 transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-${currentIndex * (140 + 16)}px)` }} // Card width + gap
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ 
+            transform: `translateX(-${currentIndex * (130 + 16)}px)`,
+          }}
         >
-          {gems.map(renderGemCard)}
+          {gems.length > 0 ? (
+            gems.map((gem, index) => (
+              <div key={gem.symbol} className="flex-shrink-0">
+                {renderGemCard(gem, index)}
+              </div>
+            ))
+          ) : (
+            <div className="text-center text-gray-400 py-10 w-full">
+              {isTimeframeChanging ? 
+                "Loading top picks..." : 
+                `No low-cap gems available for ${timeframe} timeframe`}
+            </div>
+          )}
         </div>
       </div>
       
       {/* Pagination Dots */}
-      {gems.length > visibleCards && (
-        <div className="absolute bottom-0 left-0 right-0 flex justify-center space-x-1 pb-1">
-          {Array.from({ length: Math.ceil(gems.length / visibleCards) }).map((_, i) => (
+      {gems.length > visibleCards && !isTimeframeChanging && (
+        <div className="flex justify-center mt-2">
+          {Array.from({ length: Math.ceil(gems.length / visibleCards) }).map((_, index) => (
             <button
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${
-                Math.floor(currentIndex / visibleCards) === i ? 'bg-indigo-500' : 'bg-gray-600'
-              }`}
+              key={index}
               onClick={() => {
-                setCurrentIndex(i * visibleCards);
+                if (!isAnimating) {
+                  setIsAnimating(true);
+                  setCurrentIndex(index * visibleCards);
+                  setTimeout(() => setIsAnimating(false), 500);
+                }
               }}
+              className={`w-2 h-2 rounded-full mx-1 transition-colors duration-200 ${
+                Math.floor(currentIndex / visibleCards) === index 
+                  ? 'bg-indigo-500' 
+                  : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+              aria-label={`Go to page ${index + 1}`}
             />
           ))}
         </div>
       )}
+      
+      {/* Timeframe indicator */}
+      <div className="absolute top-2 left-2 bg-indigo-900/60 text-white text-xs px-2 py-1 rounded-sm">
+        {timeframe}
+      </div>
     </div>
   );
 };
