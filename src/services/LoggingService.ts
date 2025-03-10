@@ -15,7 +15,7 @@ class LoggingService {
   };
   
   // Current log level (can be set based on environment)
-  private static logLevel = process.env.NODE_ENV === 'production' 
+  private static logLevel = import.meta.env.MODE === 'production' 
     ? LoggingService.LOG_LEVEL.INFO 
     : LoggingService.LOG_LEVEL.DEBUG;
   

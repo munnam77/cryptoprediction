@@ -9,7 +9,7 @@ LoggingService.initGlobalErrorHandling();
 
 // Log application startup
 LoggingService.info(`Starting ${ENV_CONFIG.APP_CONFIG.APP_NAME} v${ENV_CONFIG.APP_CONFIG.APP_VERSION}`);
-LoggingService.info(`Environment: ${process.env.NODE_ENV}`);
+LoggingService.info(`Environment: ${import.meta.env.MODE}`);
 
 // Lazy load the App component
 const App = lazy(() => import('./App'));

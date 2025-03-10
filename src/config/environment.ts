@@ -5,20 +5,20 @@
  */
 
 // Environment detection
-const isDevelopment = process.env.NODE_ENV === 'development';
-const isProduction = process.env.NODE_ENV === 'production';
-const isTest = process.env.NODE_ENV === 'test';
+const isDevelopment = import.meta.env.MODE === 'development';
+const isProduction = import.meta.env.MODE === 'production';
+const isTest = import.meta.env.MODE === 'test';
 
 // API configuration
 const API_CONFIG = {
   // Use environment variables with fallbacks
-  BINANCE_API_URL: process.env.VITE_BINANCE_API_URL || 'https://api.binance.com',
-  BINANCE_WS_URL: process.env.VITE_BINANCE_WS_URL || 'wss://stream.binance.com:9443/ws',
-  COINGECKO_API_URL: process.env.VITE_COINGECKO_API_URL || 'https://api.coingecko.com/api/v3',
+  BINANCE_API_URL: import.meta.env.VITE_BINANCE_API_URL || 'https://api.binance.com',
+  BINANCE_WS_URL: import.meta.env.VITE_BINANCE_WS_URL || 'wss://stream.binance.com:9443/ws',
+  COINGECKO_API_URL: import.meta.env.VITE_COINGECKO_API_URL || 'https://api.coingecko.com/api/v3',
   
   // API keys (should be set in .env file)
-  BINANCE_API_KEY: process.env.VITE_BINANCE_API_KEY || '',
-  BINANCE_API_SECRET: process.env.VITE_BINANCE_API_SECRET || '',
+  BINANCE_API_KEY: import.meta.env.VITE_BINANCE_API_KEY || '',
+  BINANCE_API_SECRET: import.meta.env.VITE_BINANCE_API_SECRET || '',
   
   // Rate limiting
   RATE_LIMIT_REQUESTS_PER_MINUTE: 1200,
@@ -57,7 +57,7 @@ const FEATURES = {
 const APP_CONFIG = {
   // App info
   APP_NAME: 'CryptoPrediction',
-  APP_VERSION: process.env.VITE_APP_VERSION || '1.0.0',
+  APP_VERSION: import.meta.env.VITE_APP_VERSION || '1.0.0',
   
   // UI configuration
   DEFAULT_THEME: 'dark',
@@ -77,7 +77,7 @@ const APP_CONFIG = {
 const LOGGING_CONFIG = {
   LOG_LEVEL: isProduction ? 'info' : 'debug',
   ENABLE_REMOTE_LOGGING: isProduction,
-  REMOTE_LOGGING_URL: process.env.VITE_REMOTE_LOGGING_URL || '',
+  REMOTE_LOGGING_URL: import.meta.env.VITE_REMOTE_LOGGING_URL || '',
   MAX_LOGS_IN_MEMORY: 1000,
 };
 
