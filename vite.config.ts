@@ -75,12 +75,20 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom'],
-            'chart-vendor': ['chart.js', 'react-chartjs-2'],
-            'ui-vendor': ['lucide-react'],
-            'rxjs-vendor': ['rxjs'],
-          },
+          manualChunks: (id) => {
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/lucide-react/')) {
+              return 'ui-vendor';
+            }
+            if (id.includes('node_modules/rxjs/')) {
+              return 'rxjs-vendor';
+            }
+            if (id.includes('node_modules/@tensorflow/tfjs')) {
+              return 'tensorflow-vendor';
+            }
+          }
         },
       },
       chunkSizeWarningLimit: 1000,
