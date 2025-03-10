@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import LoggingService from './services/LoggingService';
 import ENV_CONFIG from './config/environment';
+import initializeServices from './services/initServices';
 
 // Initialize global error handling
 LoggingService.initGlobalErrorHandling();
@@ -77,13 +78,42 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-// Render the app
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <Suspense fallback={<LoadingScreen />}>
-        <App />
-      </Suspense>
-    </ErrorBoundary>
-  </React.StrictMode>,
-);
+// Initialize services and then render the app
+initializeServices().then(() => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingScreen />}>
+          <App />
+        </Suspense>
+      </ErrorBoundary>
+    </React.StrictMode>,
+  );
+}).catch(error => {
+  LoggingService.error('Failed to initialize application', error);
+  
+  // Render error state
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex items-center justify-center">
+      <div className="bg-crypto-dark rounded-xl shadow-crypto-lg p-8 max-w-md">
+        <div className="flex items-center mb-4">
+          <div className="h-10 w-10 rounded-full bg-red-500 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="ml-3 text-xl font-bold text-white">Initialization Error</h2>
+        </div>
+        <p className="text-gray-400 mb-6">
+          We're sorry, but there was an error initializing the application. Please try refreshing the page or contact support if the problem persists.
+        </p>
+        <button 
+          className="w-full py-2 px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-md hover:opacity-90 transition-opacity"
+          onClick={() => window.location.reload()}
+        >
+          Refresh Page
+        </button>
+      </div>
+    </div>
+  );
+});
