@@ -1,22 +1,38 @@
+import { WS_CONFIG } from '../config/binance.config';
+import type { WebSocketMessage, MarketData } from '../types/binance';
+
 /**
  * BinanceWebSocketManager
+ * 
  * Manages WebSocket connections to Binance API for real-time data
+ * Implements automatic reconnection, error handling, and efficient data processing
  */
-import { API_CONFIG, WS_CONFIG } from '../config/binance.config';
-import { WebSocketMessage, MarketData, RealTimeUpdate, KlineStreamData, BookTickerStreamData } from '../types/binance';
-
 class BinanceWebSocketManager {
   private static instance: BinanceWebSocketManager;
-  private socketMap: Map<string, WebSocket>;
-  private reconnectTimeouts: Map<string, NodeJS.Timeout>;
-  private dataHandlers: Map<string, Function[]>;
+  private socket: WebSocket | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 2000; // Start with 2 seconds
+  private subscribedSymbols: string[] = [];
+  private callbacks: Map<string, Function[]> = new Map();
+  private isConnected = false;
+  private pendingSubscriptions: string[] = [];
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private lastMessageTime = 0;
+  private messageQueue: any[] = [];
+  private processingQueue = false;
+  private connectionStartTime = 0;
+  private messageCount = 0;
+  private lastLogTime = 0;
 
   private constructor() {
-    this.socketMap = new Map();
-    this.reconnectTimeouts = new Map();
-    this.dataHandlers = new Map();
+    // Private constructor for singleton pattern
   }
 
+  /**
+   * Get the singleton instance
+   */
   public static getInstance(): BinanceWebSocketManager {
     if (!BinanceWebSocketManager.instance) {
       BinanceWebSocketManager.instance = new BinanceWebSocketManager();
@@ -25,278 +41,324 @@ class BinanceWebSocketManager {
   }
 
   /**
-   * Subscribe to ticker updates for multiple symbols
-   * @param symbols Array of symbols to subscribe to (e.g. ["BTCUSDT", "ETHUSDT"])
-   * @param onUpdate Callback function to receive updates
+   * Initialize WebSocket connection
    */
-  public subscribeToTickerUpdates(symbols: string[], onUpdate: (data: MarketData[]) => void): void {
-    // Close any existing connections
-    this.closeExistingConnections('ticker');
-
-    if (!symbols || symbols.length === 0) {
-      console.warn('No symbols provided for ticker subscription');
+  private initializeWebSocket(): void {
+    if (this.socket) {
+      this.cleanupSocket();
+    }
+    
+    try {
+      console.log('Initializing WebSocket connection to Binance...');
+      this.socket = new WebSocket(WS_CONFIG.baseUrl);
+      this.connectionStartTime = Date.now();
+      this.messageCount = 0;
+      
+      this.socket.onopen = this.handleOpen.bind(this);
+      this.socket.onmessage = this.handleMessage.bind(this);
+      this.socket.onerror = this.handleError.bind(this);
+      this.socket.onclose = this.handleClose.bind(this);
+      
+      // Start heartbeat monitoring
+      this.startHeartbeat();
+    } catch (error) {
+      console.error('Error initializing WebSocket:', error);
+      this.scheduleReconnect();
+    }
+  }
+  
+  /**
+   * Handle WebSocket open event
+   */
+  private handleOpen(): void {
+    console.log('WebSocket connection established');
+    this.isConnected = true;
+    this.reconnectAttempts = 0;
+    
+    // Subscribe to any pending subscriptions
+    if (this.pendingSubscriptions.length > 0) {
+      this.subscribeToStreams(this.pendingSubscriptions);
+      this.pendingSubscriptions = [];
+    }
+    
+    // Resubscribe to previously subscribed symbols
+    if (this.subscribedSymbols.length > 0) {
+      this.subscribeToStreams(this.subscribedSymbols.map(symbol => `${symbol.toLowerCase()}@ticker`));
+    }
+  }
+  
+  /**
+   * Handle WebSocket message event
+   */
+  private handleMessage(event: MessageEvent): void {
+    this.lastMessageTime = Date.now();
+    this.messageCount++;
+    
+    // Log performance metrics every 60 seconds
+    const now = Date.now();
+    if (now - this.lastLogTime > 60000) {
+      const uptime = (now - this.connectionStartTime) / 1000;
+      const messagesPerSecond = this.messageCount / uptime;
+      console.log(`WebSocket performance: ${messagesPerSecond.toFixed(2)} messages/sec, uptime: ${uptime.toFixed(0)}s`);
+      this.lastLogTime = now;
+    }
+    
+    try {
+      const message = JSON.parse(event.data) as WebSocketMessage;
+      
+      // Add to message queue for batch processing
+      this.messageQueue.push(message);
+      
+      // Process queue if not already processing
+      if (!this.processingQueue) {
+        this.processMessageQueue();
+      }
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
+  }
+  
+  /**
+   * Process message queue in batches for better performance
+   */
+  private async processMessageQueue(): Promise<void> {
+    if (this.messageQueue.length === 0) {
+      this.processingQueue = false;
       return;
     }
-
-    // Format symbols for Binance WebSocket API
-    const formattedSymbols = symbols.map(s => s.toLowerCase() + '@ticker');
-    const streamName = 'ticker';
-
-    // Register the data handler
-    this.registerDataHandler(streamName, (data: any) => {
-      const marketData = this.convertTickerToMarketData(data);
-      if (marketData) {
-        onUpdate([marketData]);
+    
+    this.processingQueue = true;
+    
+    // Process up to 50 messages at a time
+    const batch = this.messageQueue.splice(0, 50);
+    
+    // Group messages by stream type for more efficient processing
+    const streamGroups = new Map<string, any[]>();
+    
+    batch.forEach(message => {
+      if (message.stream && message.data) {
+        const streamParts = message.stream.split('@');
+        const symbol = streamParts[0].toUpperCase();
+        const streamType = streamParts[1];
+        const callbackKey = `${symbol}:${streamType}`;
+        
+        if (!streamGroups.has(callbackKey)) {
+          streamGroups.set(callbackKey, []);
+        }
+        
+        streamGroups.get(callbackKey)?.push(message.data);
       }
     });
-
-    // Create WebSocket connection
-    const wsUrl = `${API_CONFIG.wsUrl}/stream?streams=${formattedSymbols.join('/')}`;
-    this.createSocketConnection(streamName, wsUrl);
-  }
-
-  /**
-   * Subscribe to kline/candlestick updates for a symbol
-   * @param symbol Symbol to subscribe to (e.g. "BTCUSDT")
-   * @param interval Candlestick interval
-   * @param onUpdate Callback function to receive updates
-   */
-  public subscribeToKlineUpdates(
-    symbol: string,
-    interval: string,
-    onUpdate: (data: any) => void
-  ): void {
-    const streamName = `${symbol.toLowerCase()}_kline_${interval}`;
-    const wsUrl = `${API_CONFIG.wsUrl}/ws/${symbol.toLowerCase()}@kline_${interval}`;
-
-    // Register data handler
-    this.registerDataHandler(streamName, (data: KlineStreamData) => {
-      onUpdate(data);
+    
+    // Process each group of messages
+    streamGroups.forEach((data, callbackKey) => {
+      const callbacks = this.callbacks.get(callbackKey) || [];
+      callbacks.forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error(`Error in callback for ${callbackKey}:`, error);
+        }
+      });
     });
-
-    this.createSocketConnection(streamName, wsUrl);
+    
+    // Allow UI to update before processing more messages
+    if (this.messageQueue.length > 0) {
+      setTimeout(() => this.processMessageQueue(), 0);
+    } else {
+      this.processingQueue = false;
+    }
   }
-
+  
   /**
-   * Subscribe to order book updates for a symbol
-   * @param symbol Symbol to subscribe to
-   * @param onUpdate Callback function to receive updates
+   * Handle WebSocket error event
    */
-  public subscribeToBookTickerUpdates(
-    symbol: string,
-    onUpdate: (data: any) => void
-  ): void {
-    const streamName = `${symbol.toLowerCase()}_bookTicker`;
-    const wsUrl = `${API_CONFIG.wsUrl}/ws/${symbol.toLowerCase()}@bookTicker`;
-
-    // Register data handler
-    this.registerDataHandler(streamName, (data: BookTickerStreamData) => {
-      onUpdate(data);
+  private handleError(event: Event): void {
+    console.error('WebSocket error:', event);
+    this.scheduleReconnect();
+  }
+  
+  /**
+   * Handle WebSocket close event
+   */
+  private handleClose(event: CloseEvent): void {
+    console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
+    this.isConnected = false;
+    this.scheduleReconnect();
+  }
+  
+  /**
+   * Schedule a reconnection attempt
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts);
+      console.log(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+      
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectAttempts++;
+        this.initializeWebSocket();
+      }, delay);
+          } else {
+      console.error('Maximum reconnection attempts reached. Please refresh the page.');
+    }
+  }
+  
+  /**
+   * Start heartbeat monitoring
+   */
+  private startHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    this.lastMessageTime = Date.now();
+    
+    this.heartbeatInterval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - this.lastMessageTime;
+      
+      // If no message received in 30 seconds, reconnect
+      if (elapsed > 30000 && this.isConnected) {
+        console.warn('No WebSocket messages received in 30 seconds, reconnecting...');
+        this.cleanupSocket();
+        this.initializeWebSocket();
+      }
+    }, 10000); // Check every 10 seconds
+  }
+  
+  /**
+   * Clean up WebSocket resources
+   */
+  private cleanupSocket(): void {
+    if (this.socket) {
+      this.socket.onopen = null;
+      this.socket.onmessage = null;
+      this.socket.onerror = null;
+      this.socket.onclose = null;
+      
+      if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+        this.socket.close();
+      }
+      
+      this.socket = null;
+    }
+    
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    
+    // Clear message queue
+    this.messageQueue = [];
+    this.processingQueue = false;
+  }
+  
+  /**
+   * Subscribe to WebSocket streams
+   */
+  private subscribeToStreams(streams: string[]): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      this.pendingSubscriptions = [...this.pendingSubscriptions, ...streams];
+      
+      if (!this.isConnected) {
+        this.initializeWebSocket();
+      }
+      
+      return;
+    }
+    
+    const subscribeMessage = {
+      method: 'SUBSCRIBE',
+      params: streams,
+      id: Date.now()
+    };
+    
+    try {
+      this.socket.send(JSON.stringify(subscribeMessage));
+      console.log(`Subscribed to streams: ${streams.join(', ')}`);
+    } catch (error) {
+      console.error('Error subscribing to streams:', error);
+      this.scheduleReconnect();
+    }
+  }
+  
+  /**
+   * Unsubscribe from WebSocket streams
+   */
+  private unsubscribeFromStreams(streams: string[]): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    
+    const unsubscribeMessage = {
+      method: 'UNSUBSCRIBE',
+      params: streams,
+      id: Date.now()
+    };
+    
+    try {
+      this.socket.send(JSON.stringify(unsubscribeMessage));
+      console.log(`Unsubscribed from streams: ${streams.join(', ')}`);
+    } catch (error) {
+      console.error('Error unsubscribing from streams:', error);
+    }
+  }
+  
+  /**
+   * Subscribe to ticker updates for multiple symbols
+   */
+  public subscribeToTickerUpdates(symbols: string[], callback: (data: any[]) => void): void {
+    // Store the symbols for reconnection
+    this.subscribedSymbols = [...new Set([...this.subscribedSymbols, ...symbols])];
+    
+    // Create streams for each symbol
+    const streams = symbols.map(symbol => `${symbol.toLowerCase()}@ticker`);
+    
+    // Store callback for each symbol
+    symbols.forEach(symbol => {
+      const callbackKey = `${symbol}:ticker`;
+      if (!this.callbacks.has(callbackKey)) {
+        this.callbacks.set(callbackKey, []);
+      }
+      this.callbacks.get(callbackKey)?.push(callback);
     });
-
-    this.createSocketConnection(streamName, wsUrl);
+    
+    // Subscribe to streams
+    this.subscribeToStreams(streams);
   }
-
-  /**
-   * Unsubscribe from ticker updates
-   */
-  public unsubscribeFromTickerUpdates(): void {
-    this.closeExistingConnections('ticker');
-  }
-
+  
   /**
    * Unsubscribe from all WebSocket streams
    */
   public unsubscribeAll(): void {
-    this.socketMap.forEach((socket, key) => {
-      this.closeSocketConnection(key);
-    });
-  }
-
-  /**
-   * Create a new WebSocket connection
-   * @param streamName Unique name for the stream
-   * @param wsUrl WebSocket URL
-   */
-  private createSocketConnection(streamName: string, wsUrl: string): void {
-    try {
-      const socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => {
-        console.log(`WebSocket connection established for ${streamName}`);
-        // Clear any reconnect timeout
-        if (this.reconnectTimeouts.has(streamName)) {
-          clearTimeout(this.reconnectTimeouts.get(streamName)!);
-          this.reconnectTimeouts.delete(streamName);
-        }
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          const handlers = this.dataHandlers.get(streamName) || [];
-          
-          // For combined streams, data comes in a specific format
-          if (message.stream && message.data) {
-            handlers.forEach(handler => handler(message.data));
-          } else {
-            // For single streams
-            handlers.forEach(handler => handler(message));
-          }
-        } catch (error) {
-          console.error(`Error parsing WebSocket message for ${streamName}:`, error);
-        }
-      };
-
-      socket.onerror = (error) => {
-        console.error(`WebSocket error for ${streamName}:`, error);
-      };
-
-      socket.onclose = (event) => {
-        console.warn(`WebSocket closed for ${streamName} with code ${event.code}`);
-        
-        // Attempt to reconnect if enabled
-        if (WS_CONFIG.reconnect.enabled) {
-          this.scheduleReconnection(streamName, wsUrl);
-        }
-      };
-
-      this.socketMap.set(streamName, socket);
-    } catch (error) {
-      console.error(`Error creating WebSocket connection for ${streamName}:`, error);
-      
-      // Attempt to reconnect
-      if (WS_CONFIG.reconnect.enabled) {
-        this.scheduleReconnection(streamName, wsUrl);
-      }
+    if (this.subscribedSymbols.length === 0) {
+      return;
     }
+    
+    const streams = this.subscribedSymbols.map(symbol => `${symbol.toLowerCase()}@ticker`);
+    this.unsubscribeFromStreams(streams);
+    
+    this.subscribedSymbols = [];
+    this.callbacks.clear();
   }
-
+  
   /**
-   * Close an existing WebSocket connection
-   * @param streamName Name of the stream to close
+   * Close WebSocket connection and clean up resources
    */
-  private closeSocketConnection(streamName: string): void {
-    const socket = this.socketMap.get(streamName);
-    if (socket) {
-      socket.close();
-      this.socketMap.delete(streamName);
-    }
-
-    // Clear any reconnect timeout
-    if (this.reconnectTimeouts.has(streamName)) {
-      clearTimeout(this.reconnectTimeouts.get(streamName)!);
-      this.reconnectTimeouts.delete(streamName);
-    }
-
-    // Clear data handlers
-    this.dataHandlers.delete(streamName);
-  }
-
-  /**
-   * Close any existing connections for a stream type
-   * @param streamPrefix Prefix of stream names to close
-   */
-  private closeExistingConnections(streamPrefix: string): void {
-    this.socketMap.forEach((_, key) => {
-      if (key.startsWith(streamPrefix)) {
-        this.closeSocketConnection(key);
-      }
-    });
-  }
-
-  /**
-   * Schedule a reconnection attempt
-   * @param streamName Stream name to reconnect
-   * @param wsUrl WebSocket URL
-   */
-  private scheduleReconnection(streamName: string, wsUrl: string): void {
-    if (this.reconnectTimeouts.has(streamName)) {
-      clearTimeout(this.reconnectTimeouts.get(streamName)!);
-    }
-
-    const timeout = setTimeout(() => {
-      console.log(`Attempting to reconnect ${streamName}...`);
-      this.createSocketConnection(streamName, wsUrl);
-    }, WS_CONFIG.reconnect.delay);
-
-    this.reconnectTimeouts.set(streamName, timeout);
-  }
-
-  /**
-   * Register a data handler for a stream
-   * @param streamName Stream name
-   * @param handler Handler function
-   */
-  private registerDataHandler(streamName: string, handler: Function): void {
-    if (!this.dataHandlers.has(streamName)) {
-      this.dataHandlers.set(streamName, []);
-    }
-    this.dataHandlers.get(streamName)!.push(handler);
-  }
-
-  /**
-   * Convert ticker data to MarketData format
-   * @param tickerData Raw ticker data from WebSocket
-   * @returns Formatted MarketData object
-   */
-  private convertTickerToMarketData(tickerData: any): MarketData | null {
-    try {
-      const symbol = tickerData.s; // Symbol
-      
-      // Extract necessary parts from symbol (e.g., BTC from BTCUSDT)
-      let baseAsset = symbol;
-      let quoteAsset = 'USDT';
-      
-      if (symbol.endsWith('USDT')) {
-        baseAsset = symbol.slice(0, -4);
-        quoteAsset = 'USDT';
-      } else if (symbol.endsWith('BTC')) {
-        baseAsset = symbol.slice(0, -3);
-        quoteAsset = 'BTC';
-      }
-
-      return {
-        symbol,
-        baseAsset,
-        quoteAsset,
-        price: parseFloat(tickerData.c),
-        priceChangePercent: parseFloat(tickerData.P),
-        volume: parseFloat(tickerData.q),
-        volumeChangePercent: 0, // Not provided in ticker, would need additional calculation
-        liquidity: 0, // Would need to be calculated from other data
-        rsi: 0, // Would need calculation from historical data
-        btcCorrelation: 0, // Would need calculation from historical data
-        priceVelocity: 0, // Would need calculation from recent price changes
-        priceVelocityTrend: 'stable' as const
-      };
-    } catch (error) {
-      console.error('Error converting ticker data to MarketData:', error);
-      return null;
+  public close(): void {
+    this.unsubscribeAll();
+    this.cleanupSocket();
+    
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
   }
 }
 
-// Export singleton instance methods
-export const subscribeToTickerUpdates = (symbols: string[], onUpdate: (data: MarketData[]) => void) => {
-  BinanceWebSocketManager.getInstance().subscribeToTickerUpdates(symbols, onUpdate);
-};
-
-export const subscribeToKlineUpdates = (symbol: string, interval: string, onUpdate: (data: any) => void) => {
-  BinanceWebSocketManager.getInstance().subscribeToKlineUpdates(symbol, interval, onUpdate);
-};
-
-export const subscribeToBookTickerUpdates = (symbol: string, onUpdate: (data: any) => void) => {
-  BinanceWebSocketManager.getInstance().subscribeToBookTickerUpdates(symbol, onUpdate);
-};
-
-export const unsubscribeFromTickerUpdates = () => {
-  BinanceWebSocketManager.getInstance().unsubscribeFromTickerUpdates();
-};
-
-export const unsubscribeAll = () => {
-  BinanceWebSocketManager.getInstance().unsubscribeAll();
-};
-
-// Change to default export
 export default BinanceWebSocketManager;

@@ -1,59 +1,45 @@
 import React from 'react';
 
 interface OrderBookImbalanceTagProps {
-  imbalance: number;  // 0-100 value where higher means more buy pressure
-  volume: number;     // Trading volume for context
-  className?: string;
+  value: number; // -100 to 100 scale, negative = sell pressure, positive = buy pressure
 }
 
 /**
  * OrderBookImbalanceTag Component
- * Displays a rounded tag showing buy/sell order book imbalance
+ * 
+ * Displays a tag indicating the imbalance between buy and sell orders
+ * Positive values = more buy orders (bullish)
+ * Negative values = more sell orders (bearish)
+ * The color and intensity depends on the imbalance strength
  */
-const OrderBookImbalanceTag: React.FC<OrderBookImbalanceTagProps> = ({
-  imbalance,
-  volume,
-  className = ''
-}) => {
-  // Ensure imbalance is between 0 and 100
-  const validImbalance = Math.min(Math.max(imbalance, 0), 100);
-  const buyPercentage = validImbalance;
-  const sellPercentage = 100 - validImbalance;
+const OrderBookImbalanceTag: React.FC<OrderBookImbalanceTagProps> = ({ value }) => {
+  // Normalize value to ensure it's within -100 to 100 range
+  const normalizedValue = Math.min(100, Math.max(-100, value));
+  const absValue = Math.abs(normalizedValue);
   
-  // Determine tag color based on buy/sell ratio
-  const getTagColor = () => {
-    if (buyPercentage >= 70) return 'bg-green-500 text-white';
-    if (buyPercentage >= 55) return 'bg-green-400 text-white';
-    if (buyPercentage >= 45) return 'bg-gray-500 text-white';
-    if (buyPercentage >= 30) return 'bg-red-400 text-white';
-    return 'bg-red-500 text-white';
-  };
-
-  // Format volume for display
-  const formatVolume = (vol: number): string => {
-    if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(1)}B`;
-    if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(1)}M`;
-    if (vol >= 1_000) return `${(vol / 1_000).toFixed(1)}K`;
-    return vol.toFixed(0);
+  // Determine background color based on imbalance
+  const getBackgroundColor = () => {
+    if (normalizedValue > 50) return 'bg-green-500/20 text-green-500 border-green-500/30';
+    if (normalizedValue > 20) return 'bg-green-400/15 text-green-400 border-green-400/30';
+    if (normalizedValue > 0) return 'bg-green-300/10 text-green-300 border-green-300/20';
+    if (normalizedValue > -20) return 'bg-red-300/10 text-red-300 border-red-300/20';
+    if (normalizedValue > -50) return 'bg-red-400/15 text-red-400 border-red-400/30';
+    return 'bg-red-500/20 text-red-500 border-red-500/30';
   };
   
-  // Get tooltip text
-  const getTooltip = () => {
-    return `Order book pressure: ${buyPercentage.toFixed(0)}% buy, ${sellPercentage.toFixed(0)}% sell
-Volume: $${formatVolume(volume)}`;
+  // Get label text based on imbalance
+  const getLabel = () => {
+    if (absValue < 10) return 'Neutral';
+    if (normalizedValue > 0) return 'Buy Pressure';
+    return 'Sell Pressure';
   };
   
   return (
     <div 
-      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTagColor()} ${className}`}
-      title={getTooltip()}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getBackgroundColor()}`}
+      title={`Order book imbalance: ${normalizedValue}`}
     >
-      <span className="relative">
-        {buyPercentage.toFixed(0)}%
-        {buyPercentage >= 65 && (
-          <span className="absolute top-0 right-0 h-1.5 w-1.5 rounded-full bg-white animate-ping" />
-        )}
-      </span>
+      {getLabel()} {absValue > 10 ? `${absValue}%` : ''}
     </div>
   );
 };

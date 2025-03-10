@@ -13,78 +13,53 @@ export const WS_TESTNET_URL = 'wss://testnet.binance.vision';
 
 // API Settings
 export const API_CONFIG = {
-  // Use false in production, true for testing
-  useTestnet: false,
-  
-  // Base URL based on environment
-  get baseUrl() {
-    return this.useTestnet ? API_TESTNET_URL : API_BASE_URL;
-  },
-  
-  // WebSocket URL based on environment
-  get wsUrl() {
-    return this.useTestnet ? WS_TESTNET_URL : WS_BASE_URL;
-  },
-  
-  // Request timeout in milliseconds
-  timeout: 30000,
-  
-  // Default request headers
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  
-  // API rate limits
+  baseUrl: 'https://api.binance.com',
   rateLimits: {
-    // Requests per minute
-    requestsPerMinute: 1200,
-    // Orders per second
-    ordersPerSecond: 10
-  }
+    requestsPerMinute: 1200, // Binance allows 1200 requests per minute
+    requestWeight: 10 // Default weight for most endpoints
+  },
+  timeout: 30000 // 30 seconds timeout
 };
 
 // WebSocket Settings
 export const WS_CONFIG = {
-  // WebSocket reconnection settings
-  reconnect: {
-    enabled: true,
-    maxAttempts: 5,
-    delay: 3000  // ms between reconnection attempts
-  },
-  
-  // WebSocket stream types
-  streams: {
-    ticker: '/ws/ticker',
-    depth: '/ws/depth',
-    trades: '/ws/trades',
-    kline: '/ws/kline'
-  }
+  baseUrl: 'wss://stream.binance.com:9443/ws',
+  combinedStreamsBaseUrl: 'wss://stream.binance.com:9443/stream',
+  reconnectDelay: 5000, // 5 seconds
+  maxReconnectAttempts: 5
 };
 
 // REST API Endpoints
 export const ENDPOINTS = {
-  // Public Endpoints
-  exchange: {
-    info: '/api/v3/exchangeInfo',
-    serverTime: '/api/v3/time',
-    ping: '/api/v3/ping'
-  },
-  
-  // Market Data Endpoints
-  market: {
-    depth: '/api/v3/depth',
-    trades: '/api/v3/trades',
-    historicalTrades: '/api/v3/historicalTrades',
-    aggTrades: '/api/v3/aggTrades',
-    klines: '/api/v3/klines',
-    ticker24hr: '/api/v3/ticker/24hr',
-    tickerPrice: '/api/v3/ticker/price',
-    bookTicker: '/api/v3/ticker/bookTicker'
-  }
+  exchangeInfo: '/api/v3/exchangeInfo',
+  ticker24hr: '/api/v3/ticker/24hr',
+  klines: '/api/v3/klines',
+  depth: '/api/v3/depth',
+  trades: '/api/v3/trades',
+  aggTrades: '/api/v3/aggTrades'
+};
+
+export const TIMEFRAMES = {
+  '1m': 60 * 1000,
+  '3m': 3 * 60 * 1000,
+  '5m': 5 * 60 * 1000,
+  '15m': 15 * 60 * 1000,
+  '30m': 30 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '2h': 2 * 60 * 60 * 1000,
+  '4h': 4 * 60 * 60 * 1000,
+  '6h': 6 * 60 * 60 * 1000,
+  '8h': 8 * 60 * 60 * 1000,
+  '12h': 12 * 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000,
+  '3d': 3 * 24 * 60 * 60 * 1000,
+  '1w': 7 * 24 * 60 * 60 * 1000,
+  '1M': 30 * 24 * 60 * 60 * 1000
 };
 
 export default {
   API_CONFIG,
   WS_CONFIG,
-  ENDPOINTS
+  ENDPOINTS,
+  TIMEFRAMES
 };

@@ -1,46 +1,40 @@
 import React from 'react';
-import { TimeFrame } from '../types/binance';
+import { Clock } from 'lucide-react';
+import type { TimeFrame } from '../types/binance';
 
 interface TimeframeSelectorProps {
   selectedTimeframe: TimeFrame;
-  onTimeframeChange: (timeframe: TimeFrame) => void;
-  timeframes: TimeFrame[];
-  className?: string;
+  onChange: (timeframe: TimeFrame) => void;
 }
 
 /**
  * TimeframeSelector Component
- * Renders a tab-based selector for different timeframes
+ * 
+ * Allows users to select different timeframes for market data
  */
 const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({
   selectedTimeframe,
-  onTimeframeChange,
-  timeframes,
-  className = ''
+  onChange
 }) => {
-  // Map of timeframe labels for display
-  const timeframeLabels: Record<TimeFrame, string> = {
-    '15m': '15m',
-    '30m': '30m',
-    '1h': '1h',
-    '4h': '4h',
-    '1d': '1d'
-  };
-
+  const timeframes: TimeFrame[] = ['15m', '30m', '1h', '4h', '1d'];
+  
   return (
-    <div className={`inline-flex bg-gray-700 bg-opacity-50 rounded-md ${className}`}>
+    <div className="flex items-center space-x-1 bg-gray-800 rounded-lg p-1">
+      <div className="p-1.5 text-gray-400">
+        <Clock className="h-4 w-4" />
+      </div>
+      
       {timeframes.map((timeframe) => (
         <button
           key={timeframe}
-          onClick={() => onTimeframeChange(timeframe)}
-          className={`px-3 py-1 text-xs rounded-md transition-colors duration-200 ${
-            selectedTimeframe === timeframe 
-              ? 'bg-indigo-600 text-white border-2 border-indigo-400' 
-              : 'text-gray-300 hover:bg-gray-600'
+          className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+            selectedTimeframe === timeframe
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
           }`}
-          title={`Switch to ${timeframeLabels[timeframe]} timeframe`}
+          onClick={() => onChange(timeframe)}
         >
-          {timeframeLabels[timeframe]}
+          {timeframe}
         </button>
       ))}
     </div>

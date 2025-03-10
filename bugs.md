@@ -1,602 +1,88 @@
-TopPicksCarousel.tsx:188 Uncaught TypeError: Cannot read properties of undefined (reading 'sellPressure')
-    at getFeaturesToShow (TopPicksCarousel.tsx:188:28)
-    at TopPicksCarousel.tsx:421:18
-    at Array.map (<anonymous>)
-    at TopPicksCarousel (TopPicksCarousel.tsx:238:15)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at HTMLUnknownElement.callCallback2 (react-dom_client.js?v=6103576c:3672:22)
-    at Object.invokeGuardedCallbackDev (react-dom_client.js?v=6103576c:3697:24)
-    at invokeGuardedCallback (react-dom_client.js?v=6103576c:3731:39)
-getFeaturesToShow @ TopPicksCarousel.tsx:188
-(anonymous) @ TopPicksCarousel.tsx:421
-TopPicksCarousel @ TopPicksCarousel.tsx:238
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-callCallback2 @ react-dom_client.js?v=6103576c:3672
-invokeGuardedCallbackDev @ react-dom_client.js?v=6103576c:3697
-invokeGuardedCallback @ react-dom_client.js?v=6103576c:3731
-beginWork$1 @ react-dom_client.js?v=6103576c:19763
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-LiquidityDepthGauge.tsx:74 Uncaught TypeError: Cannot read properties of undefined (reading '0')
-    at LiquidityDepthGauge (LiquidityDepthGauge.tsx:74:62)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at HTMLUnknownElement.callCallback2 (react-dom_client.js?v=6103576c:3672:22)
-    at Object.invokeGuardedCallbackDev (react-dom_client.js?v=6103576c:3697:24)
-    at invokeGuardedCallback (react-dom_client.js?v=6103576c:3731:39)
-    at beginWork$1 (react-dom_client.js?v=6103576c:19763:15)
-    at performUnitOfWork (react-dom_client.js?v=6103576c:19196:20)
-    at workLoopSync (react-dom_client.js?v=6103576c:19135:13)
-LiquidityDepthGauge @ LiquidityDepthGauge.tsx:74
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-callCallback2 @ react-dom_client.js?v=6103576c:3672
-invokeGuardedCallbackDev @ react-dom_client.js?v=6103576c:3697
-invokeGuardedCallback @ react-dom_client.js?v=6103576c:3731
-beginWork$1 @ react-dom_client.js?v=6103576c:19763
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-hook.js:608 Warning: Received NaN for the `cx` attribute. If this is expected, cast the value to a string. Error Component Stack
-    at circle (<anonymous>)
-    at svg (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at VolatilityVolumeCorrelationDot (VolatilityVolumeCorrelationDot.tsx:16:3)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at TopGainersCarousel (TopGainersCarousel.tsx:38:3)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at MainLayout (MainLayout.tsx:48:3)
-    at div (<anonymous>)
-    at AppContainer (AppContainer.tsx:11:54)
-    at App (<anonymous>)
-overrideMethod @ hook.js:608
-printWarning @ react-dom_client.js?v=6103576c:519
-error @ react-dom_client.js?v=6103576c:503
-validateProperty$1 @ react-dom_client.js?v=6103576c:3411
-warnUnknownProperties @ react-dom_client.js?v=6103576c:3457
-validateProperties$2 @ react-dom_client.js?v=6103576c:3476
-validatePropertiesInDevelopment @ react-dom_client.js?v=6103576c:7344
-setInitialProperties @ react-dom_client.js?v=6103576c:7533
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-hook.js:608 Warning: Received NaN for the `cy` attribute. If this is expected, cast the value to a string. Error Component Stack
-    at circle (<anonymous>)
-    at svg (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at VolatilityVolumeCorrelationDot (VolatilityVolumeCorrelationDot.tsx:16:3)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at TopGainersCarousel (TopGainersCarousel.tsx:38:3)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at MainLayout (MainLayout.tsx:48:3)
-    at div (<anonymous>)
-    at AppContainer (AppContainer.tsx:11:54)
-    at App (<anonymous>)
-overrideMethod @ hook.js:608
-printWarning @ react-dom_client.js?v=6103576c:519
-error @ react-dom_client.js?v=6103576c:503
-validateProperty$1 @ react-dom_client.js?v=6103576c:3411
-warnUnknownProperties @ react-dom_client.js?v=6103576c:3457
-validateProperties$2 @ react-dom_client.js?v=6103576c:3476
-validatePropertiesInDevelopment @ react-dom_client.js?v=6103576c:7344
-setInitialProperties @ react-dom_client.js?v=6103576c:7533
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-hook.js:608 Warning: Received NaN for the `r` attribute. If this is expected, cast the value to a string. Error Component Stack
-    at circle (<anonymous>)
-    at svg (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at VolatilityVolumeCorrelationDot (VolatilityVolumeCorrelationDot.tsx:16:3)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at TopGainersCarousel (TopGainersCarousel.tsx:38:3)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at MainLayout (MainLayout.tsx:48:3)
-    at div (<anonymous>)
-    at AppContainer (AppContainer.tsx:11:54)
-    at App (<anonymous>)
-overrideMethod @ hook.js:608
-printWarning @ react-dom_client.js?v=6103576c:519
-error @ react-dom_client.js?v=6103576c:503
-validateProperty$1 @ react-dom_client.js?v=6103576c:3411
-warnUnknownProperties @ react-dom_client.js?v=6103576c:3457
-validateProperties$2 @ react-dom_client.js?v=6103576c:3476
-validatePropertiesInDevelopment @ react-dom_client.js?v=6103576c:7344
-setInitialProperties @ react-dom_client.js?v=6103576c:7533
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cx: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cy: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute r: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <path> attribute d: Expected number, "M0,NaN \n           …".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-LiquidityDepthGauge.tsx:74 Uncaught TypeError: Cannot read properties of undefined (reading '0')
-    at LiquidityDepthGauge (LiquidityDepthGauge.tsx:74:62)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at HTMLUnknownElement.callCallback2 (react-dom_client.js?v=6103576c:3672:22)
-    at Object.invokeGuardedCallbackDev (react-dom_client.js?v=6103576c:3697:24)
-    at invokeGuardedCallback (react-dom_client.js?v=6103576c:3731:39)
-    at beginWork$1 (react-dom_client.js?v=6103576c:19763:15)
-    at performUnitOfWork (react-dom_client.js?v=6103576c:19196:20)
-    at workLoopSync (react-dom_client.js?v=6103576c:19135:13)
-LiquidityDepthGauge @ LiquidityDepthGauge.tsx:74
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-callCallback2 @ react-dom_client.js?v=6103576c:3672
-invokeGuardedCallbackDev @ react-dom_client.js?v=6103576c:3697
-invokeGuardedCallback @ react-dom_client.js?v=6103576c:3731
-beginWork$1 @ react-dom_client.js?v=6103576c:19763
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cx: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cy: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute r: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <path> attribute d: Expected number, "M0,NaN \n           …".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18676
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-TopPicksCarousel.tsx:188 Uncaught TypeError: Cannot read properties of undefined (reading 'sellPressure')
-    at getFeaturesToShow (TopPicksCarousel.tsx:188:28)
-    at TopPicksCarousel.tsx:421:18
-    at Array.map (<anonymous>)
-    at TopPicksCarousel (TopPicksCarousel.tsx:238:15)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at HTMLUnknownElement.callCallback2 (react-dom_client.js?v=6103576c:3672:22)
-    at Object.invokeGuardedCallbackDev (react-dom_client.js?v=6103576c:3697:24)
-    at invokeGuardedCallback (react-dom_client.js?v=6103576c:3731:39)
-getFeaturesToShow @ TopPicksCarousel.tsx:188
-(anonymous) @ TopPicksCarousel.tsx:421
-TopPicksCarousel @ TopPicksCarousel.tsx:238
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-callCallback2 @ react-dom_client.js?v=6103576c:3672
-invokeGuardedCallbackDev @ react-dom_client.js?v=6103576c:3697
-invokeGuardedCallback @ react-dom_client.js?v=6103576c:3731
-beginWork$1 @ react-dom_client.js?v=6103576c:19763
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-LiquidityDepthGauge.tsx:74 Uncaught TypeError: Cannot read properties of undefined (reading '0')
-    at LiquidityDepthGauge (LiquidityDepthGauge.tsx:74:62)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at HTMLUnknownElement.callCallback2 (react-dom_client.js?v=6103576c:3672:22)
-    at Object.invokeGuardedCallbackDev (react-dom_client.js?v=6103576c:3697:24)
-    at invokeGuardedCallback (react-dom_client.js?v=6103576c:3731:39)
-    at beginWork$1 (react-dom_client.js?v=6103576c:19763:15)
-    at performUnitOfWork (react-dom_client.js?v=6103576c:19196:20)
-    at workLoopSync (react-dom_client.js?v=6103576c:19135:13)
-LiquidityDepthGauge @ LiquidityDepthGauge.tsx:74
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-callCallback2 @ react-dom_client.js?v=6103576c:3672
-invokeGuardedCallbackDev @ react-dom_client.js?v=6103576c:3697
-invokeGuardedCallback @ react-dom_client.js?v=6103576c:3731
-beginWork$1 @ react-dom_client.js?v=6103576c:19763
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cx: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cy: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute r: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <path> attribute d: Expected number, "M0,NaN \n           …".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-LiquidityDepthGauge.tsx:74 Uncaught TypeError: Cannot read properties of undefined (reading '0')
-    at LiquidityDepthGauge (LiquidityDepthGauge.tsx:74:62)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at HTMLUnknownElement.callCallback2 (react-dom_client.js?v=6103576c:3672:22)
-    at Object.invokeGuardedCallbackDev (react-dom_client.js?v=6103576c:3697:24)
-    at invokeGuardedCallback (react-dom_client.js?v=6103576c:3731:39)
-    at beginWork$1 (react-dom_client.js?v=6103576c:19763:15)
-    at performUnitOfWork (react-dom_client.js?v=6103576c:19196:20)
-    at workLoopSync (react-dom_client.js?v=6103576c:19135:13)
-LiquidityDepthGauge @ LiquidityDepthGauge.tsx:74
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-callCallback2 @ react-dom_client.js?v=6103576c:3672
-invokeGuardedCallbackDev @ react-dom_client.js?v=6103576c:3697
-invokeGuardedCallback @ react-dom_client.js?v=6103576c:3731
-beginWork$1 @ react-dom_client.js?v=6103576c:19763
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cx: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute cy: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <circle> attribute r: Expected length, "NaN".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:1230 Error: <path> attribute d: Expected number, "M0,NaN \n           …".
-setValueForProperty @ react-dom_client.js?v=6103576c:1230
-setInitialDOMProperties @ react-dom_client.js?v=6103576c:7460
-setInitialProperties @ react-dom_client.js?v=6103576c:7593
-finalizeInitialChildren @ react-dom_client.js?v=6103576c:8343
-completeWork @ react-dom_client.js?v=6103576c:16291
-completeUnitOfWork @ react-dom_client.js?v=6103576c:19222
-performUnitOfWork @ react-dom_client.js?v=6103576c:19204
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-hook.js:608 The above error occurred in the <TopPicksCarousel> component:
-
-    at TopPicksCarousel (http://localhost:5174/src/components/TopPicksCarousel.tsx:30:3)
-    at div
-    at div
-    at div
-    at div
-    at MainLayout (http://localhost:5174/src/components/MainLayout.tsx:40:3)
-    at div
-    at AppContainer (http://localhost:5174/src/components/AppContainer.tsx:26:54)
-    at App
-
-Consider adding an error boundary to your tree to customize error handling behavior.
-Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
-overrideMethod @ hook.js:608
-logCapturedError @ react-dom_client.js?v=6103576c:14030
-update.callback @ react-dom_client.js?v=6103576c:14050
-callCallback @ react-dom_client.js?v=6103576c:11246
-commitUpdateQueue @ react-dom_client.js?v=6103576c:11263
-commitLayoutEffectOnFiber @ react-dom_client.js?v=6103576c:17091
-commitLayoutMountEffects_complete @ react-dom_client.js?v=6103576c:17978
-commitLayoutEffects_begin @ react-dom_client.js?v=6103576c:17967
-commitLayoutEffects @ react-dom_client.js?v=6103576c:17918
-commitRootImpl @ react-dom_client.js?v=6103576c:19351
-commitRoot @ react-dom_client.js?v=6103576c:19275
-finishConcurrentRender @ react-dom_client.js?v=6103576c:18758
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18716
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-2hook.js:608 The above error occurred in the <LiquidityDepthGauge> component:
-
-    at LiquidityDepthGauge (http://localhost:5174/src/components/LiquidityDepthGauge.tsx:18:3)
-    at div
-    at div
-    at div
-    at div
-    at TopGainersCarousel (http://localhost:5174/src/components/TopGainersCarousel.tsx:30:3)
-    at div
-    at div
-    at div
-    at div
-    at MainLayout (http://localhost:5174/src/components/MainLayout.tsx:40:3)
-    at div
-    at AppContainer (http://localhost:5174/src/components/AppContainer.tsx:26:54)
-    at App
-
-Consider adding an error boundary to your tree to customize error handling behavior.
-Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
-overrideMethod @ hook.js:608
-logCapturedError @ react-dom_client.js?v=6103576c:14030
-update.callback @ react-dom_client.js?v=6103576c:14050
-callCallback @ react-dom_client.js?v=6103576c:11246
-commitUpdateQueue @ react-dom_client.js?v=6103576c:11263
-commitLayoutEffectOnFiber @ react-dom_client.js?v=6103576c:17091
-commitLayoutMountEffects_complete @ react-dom_client.js?v=6103576c:17978
-commitLayoutEffects_begin @ react-dom_client.js?v=6103576c:17967
-commitLayoutEffects @ react-dom_client.js?v=6103576c:17918
-commitRootImpl @ react-dom_client.js?v=6103576c:19351
-commitRoot @ react-dom_client.js?v=6103576c:19275
-finishConcurrentRender @ react-dom_client.js?v=6103576c:18758
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18716
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-react-dom_client.js?v=6103576c:19411 Uncaught TypeError: Cannot read properties of undefined (reading 'sellPressure')
-    at getFeaturesToShow (TopPicksCarousel.tsx:188:28)
-    at TopPicksCarousel.tsx:421:18
-    at Array.map (<anonymous>)
-    at TopPicksCarousel (TopPicksCarousel.tsx:238:15)
-    at renderWithHooks (react-dom_client.js?v=6103576c:11546:26)
-    at mountIndeterminateComponent (react-dom_client.js?v=6103576c:14924:21)
-    at beginWork (react-dom_client.js?v=6103576c:15912:22)
-    at beginWork$1 (react-dom_client.js?v=6103576c:19751:22)
-    at performUnitOfWork (react-dom_client.js?v=6103576c:19196:20)
-    at workLoopSync (react-dom_client.js?v=6103576c:19135:13)
-getFeaturesToShow @ TopPicksCarousel.tsx:188
-(anonymous) @ TopPicksCarousel.tsx:421
-TopPicksCarousel @ TopPicksCarousel.tsx:238
-renderWithHooks @ react-dom_client.js?v=6103576c:11546
-mountIndeterminateComponent @ react-dom_client.js?v=6103576c:14924
-beginWork @ react-dom_client.js?v=6103576c:15912
-beginWork$1 @ react-dom_client.js?v=6103576c:19751
-performUnitOfWork @ react-dom_client.js?v=6103576c:19196
-workLoopSync @ react-dom_client.js?v=6103576c:19135
-renderRootSync @ react-dom_client.js?v=6103576c:19114
-recoverFromConcurrentError @ react-dom_client.js?v=6103576c:18734
-performConcurrentWorkOnRoot @ react-dom_client.js?v=6103576c:18682
-workLoop @ react-dom_client.js?v=6103576c:195
-flushWork @ react-dom_client.js?v=6103576c:174
-performWorkUntilDeadline @ react-dom_client.js?v=6103576c:382Understand this errorAI
-chext_driver.js:500 Initialized driver at: Sun Mar 09 2025 20:50:33 GMT+0900 (Japan Standard Time)
-chext_loader.js:71 Initialized chextloader at: 1741521033498
+[20:15:06.657] Running build in Washington, D.C., USA (East) – iad1
+[20:15:06.754] Cloning github.com/munnam77/cryptoprediction (Branch: v2, Commit: 531cb4a)
+[20:15:06.911] Previous build caches not available
+[20:15:07.059] Cloning completed: 305.000ms
+[20:15:07.345] Running "vercel build"
+[20:15:07.729] Vercel CLI 41.2.2
+[20:15:08.292] Running "install" command: `npm install --ignore-scripts`...
+[20:15:13.311] npm warn deprecated tailwindcss-filters@3.0.0: Use Tailwind's filter utilities
+[20:15:13.428] npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+[20:15:13.623] npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+[20:15:14.022] npm warn deprecated npmlog@6.0.2: This package is no longer supported.
+[20:15:14.689] npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+[20:15:15.078] npm warn deprecated gauge@4.0.4: This package is no longer supported.
+[20:15:15.380] npm warn deprecated are-we-there-yet@3.0.1: This package is no longer supported.
+[20:15:15.755] npm warn deprecated @npmcli/move-file@2.0.1: This functionality has been moved to @npmcli/fs
+[20:15:15.809] npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+[20:15:15.838] npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
+[20:15:16.406] npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+[20:15:16.590] npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+[20:15:16.618] npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+[20:15:16.739] npm warn deprecated glob@8.1.0: Glob versions prior to v9 are no longer supported
+[20:15:19.759] npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+[20:15:23.881] 
+[20:15:23.881] added 924 packages, and audited 925 packages in 15s
+[20:15:23.881] 
+[20:15:23.881] 186 packages are looking for funding
+[20:15:23.881]   run `npm fund` for details
+[20:15:23.898] 
+[20:15:23.898] 8 vulnerabilities (6 moderate, 2 high)
+[20:15:23.898] 
+[20:15:23.898] To address issues that do not require attention, run:
+[20:15:23.898]   npm audit fix
+[20:15:23.898] 
+[20:15:23.898] To address all issues (including breaking changes), run:
+[20:15:23.898]   npm audit fix --force
+[20:15:23.898] 
+[20:15:23.899] Run `npm audit` for details.
+[20:15:25.505] 
+[20:15:25.506] up to date, audited 925 packages in 1s
+[20:15:25.506] 
+[20:15:25.506] 186 packages are looking for funding
+[20:15:25.506]   run `npm fund` for details
+[20:15:25.522] 
+[20:15:25.523] 8 vulnerabilities (6 moderate, 2 high)
+[20:15:25.523] 
+[20:15:25.523] To address issues that do not require attention, run:
+[20:15:25.523]   npm audit fix
+[20:15:25.523] 
+[20:15:25.523] To address all issues (including breaking changes), run:
+[20:15:25.523]   npm audit fix --force
+[20:15:25.523] 
+[20:15:25.523] Run `npm audit` for details.
+[20:15:25.650] 
+[20:15:25.650] > crypto-prediction-app@1.0.0 build
+[20:15:25.650] > vite build
+[20:15:25.651] 
+[20:15:25.962] (!) the `splitVendorChunk` plugin doesn't have any effect when using the object form of `build.rollupOptions.output.manualChunks`. Consider using the function form instead.
+[20:15:26.008] [36mvite v5.4.14 [32mbuilding for production...[36m[39m
+[20:15:26.273] transforming...
+[20:15:35.635] [32m✓[39m 2944 modules transformed.
+[20:15:35.642] [31mx[39m Build failed in 9.40s
+[20:15:37.284] 
+[20:15:37.285] PWA v0.17.5
+[20:15:37.285] mode      generateSW
+[20:15:37.285] precache  2 entries (0.00 KiB)
+[20:15:37.285] files generated
+[20:15:37.285]   dist/sw.js
+[20:15:37.285]   dist/workbox-54d0af47.js
+[20:15:37.285] warnings
+[20:15:37.285]   One of the glob patterns doesn't match any files. Please remove or fix the following: {
+[20:15:37.285]   "globDirectory": "/vercel/path0/dist",
+[20:15:37.285]   "globPattern": "**/*.{js,wasm,css,html}",
+[20:15:37.285]   "globIgnores": [
+[20:15:37.285]     "**/node_modules/**/*",
+[20:15:37.285]     "sw.js",
+[20:15:37.285]     "workbox-*.js"
+[20:15:37.285]   ]
+[20:15:37.285] }
+[20:15:37.285] 
+[20:15:37.286] [31merror during build:
+[20:15:37.286] [31mCould not resolve entry module "chart.js".[31m
+[20:15:37.286]     at getRollupError (file:///vercel/path0/node_modules/rollup/dist/es/shared/parseAst.js:395:41)
+[20:15:37.286]     at error (file:///vercel/path0/node_modules/rollup/dist/es/shared/parseAst.js:391:42)
+[20:15:37.286]     at ModuleLoader.loadEntryModule (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:20027:20)
+[20:15:37.286]     at async Promise.all (index 0)
+[20:15:37.286]     at async Promise.all (index 0)[39m
+[20:15:37.330] Error: Command "npm install --ignore-scripts && npm run build" exited with 1
+[20:15:37.727] 

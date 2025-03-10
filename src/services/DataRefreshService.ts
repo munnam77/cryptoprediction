@@ -1,32 +1,60 @@
-import { BinanceTicker, BinanceSymbolInfo, MarketData } from '../types/binance';
-import { TradingPair } from '../components/TradingPairTable';
+import { BehaviorSubject } from 'rxjs';
+import * as BinanceService from './BinanceService';
+import type { MarketData, TimeFrame } from '../types/binance';
 
 /**
  * DataRefreshService
- * Handles fetching live Binance data with a 30-second refresh cycle
+ * Handles automatic data refreshing at specified intervals
+ * Provides real-time updates similar to cryptobubbles.net with 30-second refresh
  */
 class DataRefreshService {
-  private static instance: DataRefreshService;
-  private refreshInterval: number = 30000; // 30 seconds
+  // Refresh interval in milliseconds (30 seconds)
+  private static REFRESH_INTERVAL = 30 * 1000;
+  
+  // Progress tracking (0-100%)
+  private progressSubject = new BehaviorSubject<number>(0);
+  public progress$ = this.progressSubject.asObservable();
+  
+  // Market data subjects
+  private marketDataSubject = new BehaviorSubject<MarketData[]>([]);
+  public marketData$ = this.marketDataSubject.asObservable();
+  
+  private topGainersSubject = new BehaviorSubject<MarketData[]>([]);
+  public topGainers$ = this.topGainersSubject.asObservable();
+  
+  private lowCapGemsSubject = new BehaviorSubject<MarketData[]>([]);
+  public lowCapGems$ = this.lowCapGemsSubject.asObservable();
+  
+  private topVolatilitySubject = new BehaviorSubject<MarketData[]>([]);
+  public topVolatility$ = this.topVolatilitySubject.asObservable();
+  
+  // Refresh timers
   private refreshTimer: NodeJS.Timeout | null = null;
-  private progressCallbacks: ((progress: number) => void)[] = [];
-  private dataCallbacks: ((data: TradingPair[]) => void)[] = [];
-  private lastRefreshTime: number = 0;
-  private currentProgress: number = 100;
-  private isRefreshing: boolean = false;
-  private tradingPairs: TradingPair[] = [];
-  private binanceApiBase: string = 'https://api.binance.com/api/v3';
+  private progressTimer: NodeJS.Timeout | null = null;
+  
+  // Selected timeframe
+  private timeframe: TimeFrame = '1d';
+  
+  // Performance tracking
+  private lastRefreshTime = 0;
+  private refreshCount = 0;
+  private totalRefreshTime = 0;
+  private isRefreshing = false;
+  
+  // Cache for market data
+  private marketDataCache = new Map<string, MarketData[]>();
+  private cacheExpiry = new Map<string, number>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  
+  // Singleton instance
+  private static instance: DataRefreshService;
 
   private constructor() {
-    // Initialize with immediate data fetch
-    this.fetchData();
-    
-    // Start progress timer
-    this.startProgressTimer();
+    // Private constructor for singleton pattern
   }
-
+  
   /**
-   * Get singleton instance
+   * Get the singleton instance
    */
   public static getInstance(): DataRefreshService {
     if (!DataRefreshService.instance) {
@@ -36,233 +64,228 @@ class DataRefreshService {
   }
 
   /**
-   * Start the progress timer that updates every second
+   * Start the auto-refresh service
+   * @param timeframe The timeframe to use for data
+   */
+  public start(timeframe: TimeFrame = '1d'): void {
+    this.timeframe = timeframe;
+    
+    // Clear any existing timers
+    this.stop();
+    
+    // Initial data fetch
+    this.refreshData();
+    
+    // Set up the refresh timer (every 30 seconds)
+    this.refreshTimer = setInterval(() => {
+      this.refreshData();
+    }, DataRefreshService.REFRESH_INTERVAL);
+    
+    // Set up progress timer (updates every second)
+    this.startProgressTimer();
+    
+    console.log(`DataRefreshService started with ${timeframe} timeframe`);
+  }
+  
+  /**
+   * Stop the auto-refresh service
+   */
+  public stop(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+    
+    this.progressSubject.next(0);
+    console.log('DataRefreshService stopped');
+  }
+  
+  /**
+   * Change the timeframe and refresh data
+   * @param timeframe The new timeframe
+   */
+  public changeTimeframe(timeframe: TimeFrame): void {
+    this.timeframe = timeframe;
+    this.refreshData();
+    
+    // Reset progress
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressSubject.next(0);
+      this.startProgressTimer();
+    }
+    
+    console.log(`Timeframe changed to ${timeframe}`);
+  }
+  
+  /**
+   * Force a manual refresh of the data
+   */
+  public forceRefresh(): void {
+    this.refreshData();
+    
+    // Reset progress
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressSubject.next(0);
+      this.startProgressTimer();
+    }
+    
+    console.log('Manual refresh triggered');
+  }
+  
+  /**
+   * Start the progress timer that updates the progress bar
    */
   private startProgressTimer(): void {
     // Update progress every second
-    setInterval(() => {
-      if (!this.isRefreshing) {
-        const elapsedTime = Date.now() - this.lastRefreshTime;
-        const newProgress = Math.max(0, 100 - (elapsedTime / this.refreshInterval) * 100);
-        this.currentProgress = newProgress;
-        
-        // Notify progress listeners
-        this.notifyProgressListeners(newProgress);
-        
-        // Trigger refresh when progress reaches 0
-        if (newProgress <= 0 && !this.isRefreshing) {
-          this.fetchData();
-        }
+    const updateInterval = 1000;
+    const steps = DataRefreshService.REFRESH_INTERVAL / updateInterval;
+    let currentStep = 0;
+    
+    this.progressTimer = setInterval(() => {
+      currentStep++;
+      const progress = Math.min(100, Math.round((currentStep / steps) * 100));
+      this.progressSubject.next(progress);
+      
+      // Reset when we reach 100%
+      if (progress >= 100) {
+        currentStep = 0;
       }
-    }, 1000);
+    }, updateInterval);
   }
-
+  
   /**
-   * Fetch data from Binance API
+   * Check if cached data is available and valid
+   * @param cacheKey The cache key
+   * @returns The cached data or null if not available
    */
-  private async fetchData(): Promise<void> {
-    if (this.isRefreshing) return;
+  private getCachedData<T>(cacheKey: string): T | null {
+    const now = Date.now();
+    const expiry = this.cacheExpiry.get(cacheKey) || 0;
+    
+    if (now < expiry && this.marketDataCache.has(cacheKey)) {
+      return this.marketDataCache.get(cacheKey) as T;
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Cache data with expiry
+   * @param cacheKey The cache key
+   * @param data The data to cache
+   */
+  private cacheData<T>(cacheKey: string, data: T): void {
+    this.marketDataCache.set(cacheKey, data as any);
+    this.cacheExpiry.set(cacheKey, Date.now() + this.CACHE_TTL);
+  }
+  
+  /**
+   * Refresh all market data
+   */
+  private async refreshData(): Promise<void> {
+    // Prevent concurrent refreshes
+    if (this.isRefreshing) {
+      console.log('Refresh already in progress, skipping');
+      return;
+    }
     
     this.isRefreshing = true;
-    this.notifyProgressListeners(0);
+    const startTime = performance.now();
     
     try {
-      // Step 1: Get all USDT trading pairs
-      const pairs = await this.getUSDTPairs();
+      console.log(`Refreshing market data for timeframe: ${this.timeframe}`);
       
-      // Step 2: Get 24hr ticker data for all pairs
-      const tickers = await this.get24hrTickers();
+      // Fetch comprehensive market data
+      const cacheKey = `marketData:${this.timeframe}`;
+      let marketData = this.getCachedData<MarketData[]>(cacheKey);
       
-      // Step 3: Filter and transform data
-      const tradingPairs = this.transformData(pairs, tickers);
+      if (!marketData) {
+        marketData = await BinanceService.getComprehensiveMarketData(this.timeframe);
+        this.cacheData(cacheKey, marketData);
+      }
       
-      // Update state
-      this.tradingPairs = tradingPairs;
+      this.marketDataSubject.next(marketData);
       
-      // Notify data listeners
-      this.notifyDataListeners(tradingPairs);
+      // Get top gainers (limit to 10)
+      const topGainersKey = `topGainers:${this.timeframe}`;
+      let topGainers = this.getCachedData<MarketData[]>(topGainersKey);
       
-      // Update refresh time
-      this.lastRefreshTime = Date.now();
+      if (!topGainers) {
+        topGainers = await BinanceService.getTopGainers(this.timeframe, 10);
+        this.cacheData(topGainersKey, topGainers);
+      }
+      
+      this.topGainersSubject.next(topGainers);
+      
+      // Get low cap gems (limit to 10)
+      const lowCapGemsKey = `lowCapGems:${this.timeframe}`;
+      let lowCapGems = this.getCachedData<MarketData[]>(lowCapGemsKey);
+      
+      if (!lowCapGems) {
+        lowCapGems = await BinanceService.getLowCapGems(this.timeframe, 10000000, 500000000, 10);
+        this.cacheData(lowCapGemsKey, lowCapGems);
+      }
+      
+      this.lowCapGemsSubject.next(lowCapGems);
+      
+      // Get top volatility coins (using getTopGainers and sorting by volatility)
+      const topVolatilityKey = `topVolatility:${this.timeframe}`;
+      let topVolatility = this.getCachedData<MarketData[]>(topVolatilityKey);
+      
+      if (!topVolatility) {
+        const allMarketData = [...marketData];
+        topVolatility = allMarketData
+          .sort((a, b) => {
+            const aVolatility = a.volatility || 0;
+            const bVolatility = b.volatility || 0;
+            return bVolatility - aVolatility;
+          })
+          .slice(0, 10);
+        
+        this.cacheData(topVolatilityKey, topVolatility);
+      }
+      
+      this.topVolatilitySubject.next(topVolatility);
+      
+      // Track performance metrics
+      const endTime = performance.now();
+      const refreshTime = endTime - startTime;
+      
+      this.refreshCount++;
+      this.totalRefreshTime += refreshTime;
+      this.lastRefreshTime = refreshTime;
+      
+      const avgRefreshTime = this.totalRefreshTime / this.refreshCount;
+      
+      console.log(`Data refresh complete for timeframe: ${this.timeframe}`);
+      console.log(`Refresh performance: ${refreshTime.toFixed(0)}ms (avg: ${avgRefreshTime.toFixed(0)}ms)`);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error refreshing market data:', error);
     } finally {
       this.isRefreshing = false;
-      this.currentProgress = 100;
-      this.notifyProgressListeners(100);
     }
   }
 
   /**
-   * Get all USDT trading pairs from Binance
+   * Get performance metrics
    */
-  private async getUSDTPairs(): Promise<BinanceSymbolInfo[]> {
-    try {
-      const response = await fetch(`${this.binanceApiBase}/exchangeInfo`);
-      const data = await response.json();
-      
-      // Filter for USDT pairs
-      return data.symbols.filter((symbol: any) => 
-        symbol.quoteAsset === 'USDT' && 
-        symbol.status === 'TRADING' &&
-        symbol.isSpotTradingAllowed
-      );
-    } catch (error) {
-      console.error('Error fetching USDT pairs:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get 24hr ticker data for all pairs
-   */
-  private async get24hrTickers(): Promise<BinanceTicker[]> {
-    try {
-      const response = await fetch(`${this.binanceApiBase}/ticker/24hr`);
-      const data = await response.json();
-      
-      // Filter for valid data
-      return data.filter((ticker: any) => 
-        ticker.symbol && 
-        ticker.symbol.endsWith('USDT') &&
-        parseFloat(ticker.quoteVolume) > 1000000 // Minimum 1M USDT volume
-      );
-    } catch (error) {
-      console.error('Error fetching 24hr tickers:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Transform Binance data to TradingPair format
-   */
-  private transformData(pairs: BinanceSymbolInfo[], tickers: BinanceTicker[]): TradingPair[] {
-    // Create a map of symbols to tickers for faster lookup
-    const tickerMap = new Map<string, BinanceTicker>();
-    tickers.forEach(ticker => {
-      tickerMap.set(ticker.symbol, ticker);
-    });
-    
-    // Transform data
-    return pairs
-      .filter(pair => tickerMap.has(pair.symbol))
-      .map(pair => {
-        const ticker = tickerMap.get(pair.symbol)!;
-        const baseAsset = pair.baseAsset;
-        const quoteAsset = pair.quoteAsset;
-        
-        // Calculate order book imbalance (mock for now, would need order book data)
-        const orderBookImbalance = Math.random() * 200 - 100;
-        
-        // Calculate price velocity (mock for now, would need historical data)
-        const priceVelocity = Math.random() * 10 - 5;
-        
-        // Determine velocity trend
-        const velocityTrend: 'accelerating' | 'decelerating' | 'stable' = 
-          priceVelocity > 2 ? 'accelerating' : 
-          priceVelocity < -2 ? 'decelerating' : 'stable';
-        
-        // Calculate pump probability (mock for now, would need more data)
-        const pumpProbability = Math.random() * 100;
-        
-        return {
-          symbol: pair.symbol,
-          baseAsset,
-          quoteAsset,
-          price: parseFloat(ticker.lastPrice),
-          priceChange24h: parseFloat(ticker.priceChangePercent),
-          volume24h: parseFloat(ticker.quoteVolume),
-          marketCap: undefined, // Would need additional API call
-          orderBookImbalance,
-          priceVelocity,
-          velocityTrend,
-          pumpProbability,
-          lastUpdated: Date.now()
-        };
-      })
-      .sort((a, b) => b.volume24h - a.volume24h)
-      .slice(0, 100); // Limit to top 100 by volume
-  }
-
-  /**
-   * Subscribe to progress updates
-   */
-  public subscribeToProgress(callback: (progress: number) => void): () => void {
-    this.progressCallbacks.push(callback);
-    
-    // Immediately notify with current progress
-    callback(this.currentProgress);
-    
-    // Return unsubscribe function
-    return () => {
-      this.progressCallbacks = this.progressCallbacks.filter(cb => cb !== callback);
+  public getPerformanceMetrics(): {
+    refreshCount: number;
+    lastRefreshTime: number;
+    avgRefreshTime: number;
+  } {
+    return {
+      refreshCount: this.refreshCount,
+      lastRefreshTime: this.lastRefreshTime,
+      avgRefreshTime: this.totalRefreshTime / Math.max(1, this.refreshCount)
     };
-  }
-
-  /**
-   * Subscribe to data updates
-   */
-  public subscribeToData(callback: (data: TradingPair[]) => void): () => void {
-    this.dataCallbacks.push(callback);
-    
-    // Immediately notify with current data if available
-    if (this.tradingPairs.length > 0) {
-      callback(this.tradingPairs);
-    }
-    
-    // Return unsubscribe function
-    return () => {
-      this.dataCallbacks = this.dataCallbacks.filter(cb => cb !== callback);
-    };
-  }
-
-  /**
-   * Notify progress listeners
-   */
-  private notifyProgressListeners(progress: number): void {
-    this.progressCallbacks.forEach(callback => {
-      try {
-        callback(progress);
-      } catch (error) {
-        console.error('Error in progress callback:', error);
-      }
-    });
-  }
-
-  /**
-   * Notify data listeners
-   */
-  private notifyDataListeners(data: TradingPair[]): void {
-    this.dataCallbacks.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error('Error in data callback:', error);
-      }
-    });
-  }
-
-  /**
-   * Force refresh data
-   */
-  public forceRefresh(): void {
-    if (!this.isRefreshing) {
-      this.fetchData();
-    }
-  }
-
-  /**
-   * Get current data
-   */
-  public getCurrentData(): TradingPair[] {
-    return [...this.tradingPairs];
-  }
-
-  /**
-   * Get current progress
-   */
-  public getCurrentProgress(): number {
-    return this.currentProgress;
   }
 }
 

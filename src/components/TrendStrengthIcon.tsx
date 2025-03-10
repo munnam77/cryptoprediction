@@ -1,80 +1,55 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 
 interface TrendStrengthIconProps {
-  direction?: 'up' | 'down' | 'sideways';
-  strength?: number; // 0-100
-  className?: string;
+  direction: 'up' | 'down';
+  strength: number; // 1-3 scale
 }
 
 /**
  * TrendStrengthIcon Component
- * Shows bull (green)/bear (red) with 1-3 bars indicating trend strength
+ * 
+ * Displays an icon indicating trend direction and strength
+ * - Direction: up or down
+ * - Strength: 1-3 scale (weak, medium, strong)
  */
-const TrendStrengthIcon: React.FC<TrendStrengthIconProps> = ({
-  direction = 'sideways',
-  strength = 0,
-  className = ''
-}) => {
-  // Normalize strength to 0-100
-  const normalizedStrength = Math.min(100, Math.max(0, strength));
+const TrendStrengthIcon: React.FC<TrendStrengthIconProps> = ({ direction, strength }) => {
+  // Ensure strength is within 1-3 range
+  const normalizedStrength = Math.min(3, Math.max(1, strength));
   
-  // Calculate number of bars (1-3) based on strength
-  const getBarCount = () => {
-    if (normalizedStrength >= 70) return 3;
-    if (normalizedStrength >= 30) return 2;
-    return 1;
-  };
-  
-  // Get color based on direction
+  // Determine color based on direction and strength
   const getColor = () => {
-    if (direction === 'up') return 'text-green-500';
-    if (direction === 'down') return 'text-red-500';
-    return 'text-gray-500';
+    if (direction === 'up') {
+      if (normalizedStrength === 3) return 'text-green-500';
+      if (normalizedStrength === 2) return 'text-green-400';
+      return 'text-green-300';
+    } else {
+      if (normalizedStrength === 3) return 'text-red-500';
+      if (normalizedStrength === 2) return 'text-red-400';
+      return 'text-red-300';
+    }
   };
   
-  // Get icon based on direction
-  const getIcon = () => {
-    if (direction === 'up') return <TrendingUp className={`${getColor()}`} size={16} />;
-    if (direction === 'down') return <TrendingDown className={`${getColor()}`} size={16} />;
-    return <Minus className={`${getColor()}`} size={16} />;
+  // Determine size based on strength
+  const getSize = () => {
+    if (normalizedStrength === 3) return 'h-5 w-5';
+    if (normalizedStrength === 2) return 'h-4 w-4';
+    return 'h-3.5 w-3.5';
   };
   
-  // Get tooltip text
-  const getTooltip = () => {
-    const directionText = direction === 'up' ? 'Bullish' : direction === 'down' ? 'Bearish' : 'Sideways';
-    const strengthText = normalizedStrength >= 70 ? 'Strong' : normalizedStrength >= 30 ? 'Moderate' : 'Weak';
-    return `${strengthText} ${directionText} Trend`;
+  // Determine animation based on strength
+  const getAnimation = () => {
+    if (normalizedStrength === 3) return 'animate-pulse';
+    return '';
   };
   
   return (
-    <div 
-      className={`flex items-center ${className} group`}
-      title={getTooltip()}
-    >
-      {/* Icon */}
-      <div className={`mr-1 ${direction === 'up' ? 'shadow-glow-green' : direction === 'down' ? 'shadow-glow-red' : ''}`}>
-        {getIcon()}
-      </div>
-      
-      {/* Strength bars */}
-      <div className="flex space-x-0.5">
-        {[1, 2, 3].map(i => (
-          <div 
-            key={i}
-            className={`w-1 h-3 rounded-sm ${
-              i <= getBarCount() 
-                ? getColor() 
-                : 'bg-gray-700'
-            }`}
-          ></div>
-        ))}
-      </div>
-      
-      {/* Tooltip */}
-      <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs bg-gray-800 px-2 py-1 rounded pointer-events-none whitespace-nowrap">
-        {getTooltip()}
-      </div>
+    <div className={`${getColor()} ${getAnimation()}`}>
+      {direction === 'up' ? (
+        <TrendingUp className={getSize()} />
+      ) : (
+        <TrendingDown className={getSize()} />
+      )}
     </div>
   );
 };

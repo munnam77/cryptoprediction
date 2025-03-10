@@ -1,89 +1,49 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 
 interface BTCRippleLineProps {
-  btcChangePercent: number;
-  height?: number;
+  changePercent: number;
 }
 
-const BTCRippleLine: React.FC<BTCRippleLineProps> = ({
-  btcChangePercent,
-  height = 24
-}) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number>();
-  const phaseRef = useRef(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas dimensions
-    canvas.width = 120;
-    canvas.height = height;
-
-    // Animation parameters
-    const amplitude = Math.min(Math.abs(btcChangePercent) / 2, 8); // Max 8px amplitude
-    const frequency = 0.05;
-    const speed = 0.05;
-    const baseY = height / 2;
-
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Set line style
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = btcChangePercent >= 0 ? '#22c55e' : '#ef4444';
-      
-      // Draw wave
-      ctx.beginPath();
-      for (let x = 0; x < canvas.width; x++) {
-        const y = baseY + amplitude * Math.sin(frequency * x + phaseRef.current);
-        if (x === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.stroke();
-
-      // Add glow effect
-      ctx.save();
-      ctx.filter = `blur(${Math.abs(btcChangePercent) * 0.2}px)`;
-      ctx.strokeStyle = btcChangePercent >= 0 ? '#22c55e33' : '#ef444433';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.restore();
-
-      // Update phase
-      phaseRef.current += speed;
-      if (phaseRef.current > Math.PI * 2) {
-        phaseRef.current = 0;
-      }
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [btcChangePercent, height]);
-
+/**
+ * BTCRippleLine Component
+ * 
+ * Displays a visual representation of Bitcoin's price change
+ * with a ripple effect that indicates market movement
+ */
+const BTCRippleLine: React.FC<BTCRippleLineProps> = ({ changePercent }) => {
+  // Determine color based on price change
+  const getColor = () => {
+    if (changePercent > 3) return 'bg-green-500';
+    if (changePercent > 0) return 'bg-green-400';
+    if (changePercent > -3) return 'bg-red-400';
+    return 'bg-red-500';
+  };
+  
+  // Determine ripple animation speed based on volatility
+  const getRippleClass = () => {
+    const absChange = Math.abs(changePercent);
+    if (absChange > 5) return 'animate-ripple-fast';
+    if (absChange > 2) return 'animate-ripple';
+    if (absChange > 0.5) return 'animate-ripple-slow';
+    return '';
+  };
+  
   return (
-    <canvas
-      ref={canvasRef}
-      className="opacity-80"
-      style={{
-        width: '120px',
-        height: `${height}px`
-      }}
-    />
+    <div className="flex items-center space-x-2">
+      <div className="text-xs font-medium">BTC</div>
+      <div className="relative h-1 bg-gray-700 rounded-full w-full overflow-hidden">
+        <div 
+          className={`absolute top-0 left-0 h-full ${getColor()} rounded-full`}
+          style={{ width: '100%', opacity: 0.5 }}
+        />
+        <div 
+          className={`absolute top-0 left-0 h-full w-2 ${getColor()} rounded-full ${getRippleClass()}`}
+        />
+      </div>
+      <div className={`text-xs font-medium ${changePercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+        {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
+      </div>
+    </div>
   );
 };
 
