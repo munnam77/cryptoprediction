@@ -3,6 +3,5 @@
   "buildCommand": "npm install --ignore-scripts && npm run build",
   "installCommand": "npm install --ignore-scripts",
   "framework": "vite",
-  "outputDirectory": "dist",
-  "nodeVersion": "18.x"
+  "outputDirectory": "dist"
 } 
